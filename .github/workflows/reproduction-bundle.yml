@@ -54,6 +54,60 @@ jobs:
           sha256sum uv.lock > reproduction/lock.sha256
           uv --version > reproduction/uv-version.txt
           uv run --locked --all-extras python -c 'import platform,sys; print(sys.version); print(platform.platform())' > reproduction/python.txt
+          # The installed native packages are ABI-specific. A text version banner
+          # alone cannot validate an offline restore or identify a substituted
+          # package. Record only explicit metadata, never the process environment.
+          uv run --locked --all-extras python - <<'PY'
+          import hashlib
+          import importlib.metadata
+          import json
+          import platform
+          import subprocess
+          import sys
+          import sysconfig
+          from pathlib import Path
+
+          root = Path('reproduction')
+          metadata = {
+              'schema_version': 1,
+              'commit': subprocess.check_output(
+                  ['git', 'rev-parse', 'HEAD'], text=True, timeout=30
+              ).strip(),
+              'lock_sha256': hashlib.sha256(Path('uv.lock').read_bytes()).hexdigest(),
+              'python_version': platform.python_version(),
+              'implementation': sys.implementation.name,
+              'cache_tag': sys.implementation.cache_tag,
+              'soabi': sysconfig.get_config_var('SOABI'),
+              'platform': sysconfig.get_platform(),
+              'libc': platform.libc_ver(),
+              'profiles': ['dev', 'all-extras'],
+              'distributions': sorted(
+                  [{'name': d.metadata['Name'], 'version': d.version}
+                   for d in importlib.metadata.distributions()],
+                  key=lambda d: (d['name'].lower(), d['version']),
+              ),
+          }
+          root.joinpath('environment.json').write_text(
+              json.dumps(metadata, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          # Blob IDs and modes establish which tracked bytes were archived. This
+          # contains no Git configuration, auth headers, reflogs or local state.
+          entries = subprocess.check_output(
+              ['git', 'ls-files', '--stage', '-z'], timeout=30
+          ).split(b'\0')
+          inventory = []
+          for entry in entries:
+              if not entry:
+                  continue
+              attributes, path = entry.split(b'\t', 1)
+              mode, oid, stage = attributes.decode('ascii').split()
+              if stage != '0':
+                  raise RuntimeError('Unmerged source cannot be reproduced')
+              inventory.append({'path': path.decode('utf-8'), 'mode': mode, 'blob': oid})
+          root.joinpath('source-inventory.json').write_text(
+              json.dumps(inventory, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          PY
           git archive --format=tar.gz HEAD > reproduction/source.tar.gz
           # Only installed packages: no Git config, environment dump, home
           # directory, session database, pip cache or runner credentials.
@@ -61,6 +115,9 @@ jobs:
           du -h reproduction/*
           test "$(du -sb reproduction | cut -f1)" -lt 157286400
           sha256sum reproduction/*.tar.gz > reproduction/archives.sha256
+          # Hash metadata too, so the declared ABI and inventory can be verified
+          # alongside the archives after the artifact leaves GitHub Actions.
+          sha256sum reproduction/*.json reproduction/*.txt reproduction/*.tar.gz > reproduction/manifest.sha256
 
       - name: Upload short-lived reproduction evidence
         uses: actions/upload-artifact@v7
