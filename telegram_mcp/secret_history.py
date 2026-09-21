@@ -24,9 +24,11 @@ logged, and `clear_secret_history` and `delete_secret_message` remove from it - 
 delete that left the text here would be a delete in name only.
 """
 
+from copy import deepcopy
 import json
 import os
 import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -55,6 +57,10 @@ _PER_CHAT_LIMIT = 500
 
 _cache: Dict[str, dict] = {}
 
+# Protect the load/copy/persist/publish transaction from other local threads.
+# This is process-local serialization, not a cross-process storage lease.
+_history_lock = threading.RLock()
+
 
 def _path(account: str) -> Path:
     return state_dir() / "secret-chats" / f"{account}-history.json"
@@ -64,32 +70,55 @@ def _load(account: str) -> dict:
     if account in _cache:
         return _cache[account]
     path = _path(account)
-    state: dict = {}
-    if path.exists():
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        state = {}
+    else:
+        # A failed read is not an empty history. Do not cache a substitute that
+        # the next write would persist over the operator's recoverable bytes.
         try:
-            state = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            # A corrupt history costs the history, never the chat. The keys live in
-            # a different file, and refusing to start because a convenience file is
-            # unreadable would turn a small loss into a total one.
-            state = {}
+            state = json.loads(text)
+        except ValueError:
+            raise ValueError(
+                "Secret-chat history is invalid; the existing file was preserved."
+            ) from None
+        if not isinstance(state, dict) or any(
+            not isinstance(messages, list) or any(not isinstance(item, dict) for item in messages)
+            for messages in state.values()
+        ):
+            raise ValueError(
+                "Secret-chat history has an invalid shape; the existing file was preserved."
+            )
     _cache[account] = state
     return state
 
 
-def _flush(account: str) -> None:
-    """Replace the file. Written beside the target so the replace is atomic."""
+def _flush(account: str, state: dict) -> None:
+    """Persist a private candidate, without publishing it to the live cache."""
     path = _path(account)
     path.parent.mkdir(parents=True, exist_ok=True)
     handle, temporary = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
     try:
         with os.fdopen(handle, "w", encoding="utf-8", newline="\n") as fh:
-            json.dump(_cache.get(account, {}), fh, indent=1, sort_keys=True)
+            json.dump(state, fh, indent=1, sort_keys=True)
+            fh.flush()
+            os.fsync(fh.fileno())
         _restrict(Path(temporary))
         os.replace(temporary, path)
     except BaseException:
-        Path(temporary).unlink(missing_ok=True)
+        # Cleanup must not hide the original storage failure.
+        try:
+            Path(temporary).unlink(missing_ok=True)
+        except OSError:
+            pass
         raise
+
+
+def _commit(account: str, state: dict) -> None:
+    """Publish only after replacement succeeds, while the caller holds the lock."""
+    _flush(account, state)
+    _cache[account] = state
 
 
 def _restrict(path: Path) -> None:
@@ -185,12 +214,13 @@ def entry(
 
 def record(account: str, chat_id: int, item: dict) -> None:
     """Append one message to a chat's history and persist it."""
-    state = _load(account)
-    messages = state.setdefault(str(int(chat_id)), [])
-    messages.append(item)
-    if len(messages) > _PER_CHAT_LIMIT:
-        del messages[: len(messages) - _PER_CHAT_LIMIT]
-    _flush(account)
+    with _history_lock:
+        state = deepcopy(_load(account))
+        messages = state.setdefault(str(int(chat_id)), [])
+        messages.append(deepcopy(item))
+        if len(messages) > _PER_CHAT_LIMIT:
+            del messages[: len(messages) - _PER_CHAT_LIMIT]
+        _commit(account, state)
 
 
 def record_received(account: str, message) -> None:
@@ -217,24 +247,27 @@ def record_received(account: str, message) -> None:
 
 def read(account: str, chat_id: int, limit: int) -> List[dict]:
     """The most recent `limit` messages, oldest first."""
-    return _load(account).get(str(int(chat_id)), [])[-limit:]
+    with _history_lock:
+        return deepcopy(_load(account).get(str(int(chat_id)), [])[-limit:])
 
 
 def forget(account: str, chat_id: int, message_ids) -> int:
     """Drop named messages. Returns how many were actually held here."""
     wanted = {int(m) for m in message_ids}
-    state = _load(account)
-    key = str(int(chat_id))
-    kept = [m for m in state.get(key, []) if m["message_id"] not in wanted]
-    removed = len(state.get(key, [])) - len(kept)
-    state[key] = kept
-    _flush(account)
-    return removed
+    with _history_lock:
+        state = deepcopy(_load(account))
+        key = str(int(chat_id))
+        kept = [m for m in state.get(key, []) if m["message_id"] not in wanted]
+        removed = len(state.get(key, [])) - len(kept)
+        state[key] = kept
+        _commit(account, state)
+        return removed
 
 
 def clear(account: str, chat_id: int) -> int:
     """Drop a whole chat's history. Returns how many messages went."""
-    state = _load(account)
-    removed = len(state.pop(str(int(chat_id)), []))
-    _flush(account)
-    return removed
+    with _history_lock:
+        state = deepcopy(_load(account))
+        removed = len(state.pop(str(int(chat_id)), []))
+        _commit(account, state)
+        return removed
