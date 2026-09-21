@@ -9,6 +9,8 @@
 ![MCP Badge](https://badge.mcpx.dev)
 [![Licence: GPL-3.0-or-later](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue?style=flat-square)](LICENSE)
 
+**English** • [راهنمای فارسی (Persian)](README.fa.md)
+
 </div>
 
 > 🛡️ **Safe-Telegram-MCP**: Hardened Telegram Model Context Protocol (MCP) server equipped with Chat Whitelisting, Anti-Flood ban protection, Read-Only safety switch, and an interactive Local Web Management Dashboard.
@@ -53,6 +55,37 @@ python main.py --ui
 # or using the CLI command:
 safe-telegram-panel
 ```
+
+---
+
+## 🔐 Golden Rules: Secure Login, IP Alignment & Device Spoofing
+
+To prevent Telegram's security algorithms from flagging your AI session as a suspicious or fraudulent device:
+
+1. **Login via QR Code Scanning (Recommended):**  
+   Avoid SMS-based logins whenever possible. Instead, run:
+   ```bash
+   uv run session_string_generator.py --qr
+   ```
+   Scanning the QR code using your official mobile Telegram app tells Telegram's anti-fraud system that this session was physically authorized in-person, resulting in the lowest possible fraud score.
+
+2. **Align IP with Your Daily Telegram Client (Local Proxy):**  
+   If your primary Telegram client uses a local proxy or VPN (e.g. Clash, V2Ray, Mihomo on `127.0.0.1:10808`), route Safe-Telegram-MCP through the **exact same proxy** in `.env`:
+   ```env
+   TELEGRAM_PROXY_TYPE=socks5
+   TELEGRAM_PROXY_HOST=127.0.0.1
+   TELEGRAM_PROXY_PORT=10808
+   ```
+   Telegram's servers will observe both your desktop app and the MCP server connecting from the identical IP/ASN subnet, preventing geographic mismatch alerts.
+
+3. **Spoof a Legitimate Desktop Device Profile:**  
+   By default, raw Telethon identifies as generic python/platform strings. Explicitly specify your real hardware profile in `.env`:
+   ```env
+   TELEGRAM_DEVICE_MODEL="MacBook Pro"
+   TELEGRAM_SYSTEM_VERSION="macOS 15.3"
+   TELEGRAM_APP_VERSION="5.10.3"
+   ```
+   This ensures the session renders cleanly in your Telegram app under *Settings > Devices* as a recognizable personal machine.
 
 ---
 
