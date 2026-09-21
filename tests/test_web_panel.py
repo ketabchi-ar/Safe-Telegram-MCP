@@ -43,3 +43,14 @@ def test_dashboard_and_api(tmp_path):
     res = client.get("/api/config")
     assert res.json()["read_only"] is True
     assert res.json()["rate_limit_delay"] == 2.0
+
+    # 6. Test Whitelist Export
+    res = client.get("/api/whitelist/export")
+    assert res.status_code == 200
+    assert "attachment" in res.headers.get("content-disposition", "")
+    assert "allowed_chats" in res.json()
+
+    # 7. Test Whitelist Import
+    res = client.post("/api/whitelist/import", json={"allowed_chats": ["@imported_chat"]})
+    assert res.status_code == 200
+    assert "@imported_chat" in res.json()["allowed_chats"]

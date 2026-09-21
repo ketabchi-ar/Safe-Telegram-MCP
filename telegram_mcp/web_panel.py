@@ -3,6 +3,8 @@
 Provides a user-friendly management interface to:
 - Toggle Safe Mode and Read-Only Mode
 - Add/Remove whitelisted chats with ease
+- Export and Import whitelisted chats (JSON)
+- Interactive in-browser QR Code Telegram login
 - Adjust anti-flood rate limits with MTProto/Telethon documented guidelines
 - Check Telegram connection and session status
 - View account ban recovery and troubleshooting guide
@@ -10,16 +12,21 @@ Provides a user-friendly management interface to:
 
 from __future__ import annotations
 
+import asyncio
+import base64
+import io
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 import uvicorn
+import qrcode
 
 from telegram_mcp.security import (
     DEFAULT_CONFIG_FILE,
@@ -27,6 +34,27 @@ from telegram_mcp.security import (
     get_security_config,
     update_security_config,
 )
+from session_string_generator import write_env_value
+from telegram_mcp.client_identity import client_identity_kwargs
+
+# Active QR login task state
+_QR_STATE = {
+    "client": None,
+    "qr": None,
+    "task": None,
+    "status": "idle",  # "idle", "waiting_scan", "authenticated", "error"
+    "error_message": "",
+    "qr_data_uri": "",
+    "expires_at": "",
+}
+
+
+def _generate_qr_data_uri(url: str) -> str:
+    img = qrcode.make(url)
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en" class="dark">
@@ -73,9 +101,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           </div>
         </div>
       </div>
-      <div id="statusBadge" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-medium">
-        <span class="w-2.5 h-2.5 rounded-full bg-slate-500 animate-pulse" id="statusDot"></span>
-        <span id="statusText">Checking status...</span>
+      <div class="flex items-center gap-3">
+        <button onclick="openQrModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs font-semibold transition-colors">
+          <span>📲</span> QR Web Login
+        </button>
+        <div id="statusBadge" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-medium">
+          <span class="w-2.5 h-2.5 rounded-full bg-slate-500 animate-pulse" id="statusDot"></span>
+          <span id="statusText">Checking status...</span>
+        </div>
       </div>
     </header>
 
@@ -89,7 +122,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <h2 class="text-lg font-bold text-white flex items-center gap-2">
               <span>📋</span> Allowed Chats (Whitelist)
             </h2>
-            <span id="whitelistCount" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-sky-400 border border-slate-700">0 chats</span>
+            <div class="flex items-center gap-2">
+              <button onclick="exportWhitelist()" title="Export JSON" class="text-xs px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors">
+                ⬇️ Export
+              </button>
+              <label title="Import JSON" class="text-xs px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 cursor-pointer transition-colors">
+                ⬆️ Import
+                <input type="file" id="importFileInput" class="hidden" accept=".json" onchange="importWhitelist(event)">
+              </label>
+              <span id="whitelistCount" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-sky-400 border border-slate-700">0 chats</span>
+            </div>
           </div>
           <p class="text-xs text-slate-400 mb-4 leading-relaxed">
             AI agents can <strong class="text-slate-200">ONLY</strong> read, query, or send to approved targets. All private family chats, banks, and unlisted groups remain invisible and strictly forbidden.
@@ -265,8 +307,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   </div>
 
+  <!-- QR Login Modal -->
+  <div id="qrModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative text-center">
+      <button onclick="closeQrModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">✕</button>
+      
+      <h3 class="text-lg font-bold text-white flex items-center justify-center gap-2">
+        <span>📲</span> Link Telegram Device
+      </h3>
+      <p class="text-xs text-slate-400">
+        Scan the QR code using your official Telegram app:
+        <br><strong class="text-slate-200">Settings > Devices > Link Desktop Device</strong>
+      </p>
+
+      <div id="qrContainer" class="p-4 bg-white rounded-xl flex items-center justify-center min-h-[220px]">
+        <div id="qrSpinner" class="text-xs text-slate-600 animate-pulse">Initializing MTProto session...</div>
+        <img id="qrImage" class="hidden w-52 h-52 mx-auto" alt="Scan QR" />
+      </div>
+
+      <div id="qrStatusText" class="text-xs text-slate-400">Waiting for scan...</div>
+
+      <div class="flex gap-2 justify-center">
+        <button onclick="startQrAuth()" class="px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-colors">
+          Refresh QR
+        </button>
+        <button onclick="closeQrModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let currentConfig = {};
+    let qrPollInterval = null;
 
     function togglePlaybook() {
       const body = document.getElementById('playbookBody');
@@ -396,6 +470,109 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       }
     }
 
+    function exportWhitelist() {
+      window.location.href = '/api/whitelist/export';
+    }
+
+    async function importWhitelist(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const content = JSON.parse(e.target.result);
+          const chats = Array.isArray(content) ? content : content.allowed_chats;
+          if (!Array.isArray(chats)) throw new Error('Invalid JSON format');
+
+          const res = await fetch('/api/whitelist/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ allowed_chats: chats })
+          });
+          const updated = await res.json();
+          renderWhitelist(updated.allowed_chats);
+          alert('Whitelist imported successfully!');
+        } catch (err) {
+          alert('Failed to import whitelist: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function openQrModal() {
+      document.getElementById('qrModal').classList.remove('hidden');
+      startQrAuth();
+    }
+
+    function closeQrModal() {
+      document.getElementById('qrModal').classList.add('hidden');
+      if (qrPollInterval) {
+        clearInterval(qrPollInterval);
+        qrPollInterval = null;
+      }
+    }
+
+    async function startQrAuth() {
+      const spinner = document.getElementById('qrSpinner');
+      const img = document.getElementById('qrImage');
+      const statusText = document.getElementById('qrStatusText');
+
+      spinner.classList.remove('hidden');
+      spinner.textContent = "Connecting to Telegram MTProto...";
+      img.classList.add('hidden');
+      statusText.textContent = "Generating secure QR code...";
+
+      if (qrPollInterval) clearInterval(qrPollInterval);
+
+      try {
+        const res = await fetch('/api/auth/qr/start', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.status === 'error') {
+          spinner.textContent = "Error: " + data.message;
+          return;
+        }
+
+        if (data.qr_data_uri) {
+          img.src = data.qr_data_uri;
+          img.classList.remove('hidden');
+          spinner.classList.add('hidden');
+          statusText.textContent = "Scan with your phone before expiry (" + (data.expires_at || '') + ")";
+
+          qrPollInterval = setInterval(pollQrStatus, 2000);
+        }
+      } catch (err) {
+        spinner.textContent = "Failed to start QR auth: " + err;
+      }
+    }
+
+    async function pollQrStatus() {
+      try {
+        const res = await fetch('/api/auth/qr/status');
+        const data = await res.json();
+        const statusText = document.getElementById('qrStatusText');
+
+        if (data.status === 'authenticated') {
+          clearInterval(qrPollInterval);
+          statusText.className = "text-xs font-bold text-emerald-400";
+          statusText.textContent = "✅ Successfully Authenticated! Session saved to .env.";
+          setTimeout(() => {
+            closeQrModal();
+            loadStatus();
+          }, 2000);
+        } else if (data.status === 'expired') {
+          statusText.textContent = "QR expired. Click Refresh QR.";
+          clearInterval(qrPollInterval);
+        } else if (data.status === 'error') {
+          statusText.textContent = "Error: " + data.message;
+          clearInterval(qrPollInterval);
+        }
+      } catch (err) {
+        console.error('Error polling QR:', err);
+      }
+    }
+
     loadConfig();
     loadStatus();
   </script>
@@ -461,6 +638,28 @@ async def api_whitelist_remove(request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok", "allowed_chats": cfg.allowed_chats})
 
 
+async def api_whitelist_export(request: Request) -> Response:
+    cfg = get_security_config()
+    data = json.dumps({"allowed_chats": cfg.allowed_chats}, indent=2)
+    return Response(
+        content=data,
+        media_type="application/json",
+        headers={"Content-Disposition": 'attachment; filename="safe_whitelist.json"'},
+    )
+
+
+async def api_whitelist_import(request: Request) -> JSONResponse:
+    data = await request.json()
+    new_chats = data.get("allowed_chats", [])
+    cfg = get_security_config()
+    for c in new_chats:
+        c_str = str(c).strip()
+        if c_str and c_str not in cfg.allowed_chats:
+            cfg.allowed_chats.append(c_str)
+    update_security_config(cfg)
+    return JSONResponse({"status": "ok", "allowed_chats": cfg.allowed_chats})
+
+
 async def api_get_status(request: Request) -> JSONResponse:
     has_api_id = bool(os.getenv("TELEGRAM_API_ID"))
     has_session = bool(
@@ -475,13 +674,86 @@ async def api_get_status(request: Request) -> JSONResponse:
     })
 
 
+async def _async_qr_wait(client, qr):
+    from telethon import errors
+
+    try:
+        await qr.wait(timeout=60.0)
+        # Login succeeded!
+        session_str = client.session.save()
+        write_env_value("TELEGRAM_SESSION_STRING", session_str)
+        _QR_STATE["status"] = "authenticated"
+    except asyncio.TimeoutError:
+        _QR_STATE["status"] = "expired"
+    except errors.SessionPasswordNeededError:
+        _QR_STATE["status"] = "error"
+        _QR_STATE["error_message"] = "2FA Password needed. Use session_string_generator.py for 2FA."
+    except Exception as exc:
+        _QR_STATE["status"] = "error"
+        _QR_STATE["error_message"] = str(exc)
+    finally:
+        await client.disconnect()
+
+
+async def api_auth_qr_start(request: Request) -> JSONResponse:
+    from telethon import TelegramClient
+    from telethon.sessions import StringSession
+
+    api_id = os.getenv("TELEGRAM_API_ID")
+    api_hash = os.getenv("TELEGRAM_API_HASH")
+
+    if not api_id or not api_hash:
+        return JSONResponse({
+            "status": "error",
+            "message": "TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in .env first."
+        })
+
+    try:
+        api_id_int = int(api_id)
+    except ValueError:
+        return JSONResponse({"status": "error", "message": "Invalid TELEGRAM_API_ID."})
+
+    kwargs = client_identity_kwargs()
+    client = TelegramClient(StringSession(), api_id_int, api_hash, **kwargs)
+    await client.connect()
+
+    qr = await client.qr_login()
+    data_uri = _generate_qr_data_uri(qr.url)
+    expires_str = qr.expires.astimezone().strftime("%H:%M:%S")
+
+    _QR_STATE["client"] = client
+    _QR_STATE["qr"] = qr
+    _QR_STATE["status"] = "waiting_scan"
+    _QR_STATE["qr_data_uri"] = data_uri
+    _QR_STATE["expires_at"] = expires_str
+    _QR_STATE["task"] = asyncio.create_task(_async_qr_wait(client, qr))
+
+    return JSONResponse({
+        "status": "waiting_scan",
+        "qr_data_uri": data_uri,
+        "qr_url": qr.url,
+        "expires_at": expires_str,
+    })
+
+
+async def api_auth_qr_status(request: Request) -> JSONResponse:
+    return JSONResponse({
+        "status": _QR_STATE["status"],
+        "message": _QR_STATE.get("error_message", ""),
+    })
+
+
 routes = [
     Route("/", get_dashboard, methods=["GET"]),
     Route("/api/config", api_get_config, methods=["GET"]),
     Route("/api/config", api_post_config, methods=["POST"]),
     Route("/api/whitelist/add", api_whitelist_add, methods=["POST"]),
     Route("/api/whitelist/remove", api_whitelist_remove, methods=["POST"]),
+    Route("/api/whitelist/export", api_whitelist_export, methods=["GET"]),
+    Route("/api/whitelist/import", api_whitelist_import, methods=["POST"]),
     Route("/api/status", api_get_status, methods=["GET"]),
+    Route("/api/auth/qr/start", api_auth_qr_start, methods=["POST"]),
+    Route("/api/auth/qr/status", api_auth_qr_status, methods=["GET"]),
 ]
 
 app = Starlette(debug=False, routes=routes)
