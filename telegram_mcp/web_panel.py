@@ -7,6 +7,7 @@ Provides a user-friendly management interface to:
 - Export and Import whitelisted chats (JSON)
 - Interactive in-browser QR Code Telegram login
 - Automatic free port detection
+- Bilingual support (Persian with Vazirmatn font / English)
 - Adjust anti-flood rate limits with MTProto/Telethon documented guidelines
 - Check Telegram connection and session status
 - View account ban recovery and troubleshooting guide
@@ -50,7 +51,7 @@ _QR_STATE = {
     "client": None,
     "qr": None,
     "task": None,
-    "status": "idle",  # "idle", "waiting_scan", "authenticated", "error"
+    "status": "idle",
     "error_message": "",
     "qr_data_uri": "",
     "expires_at": "",
@@ -109,11 +110,14 @@ def find_available_port(start_port: int = 8080, max_tries: int = 50) -> int:
 
 
 HTML_TEMPLATE = """<!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="fa" dir="rtl" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Safe-Telegram-MCP Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -131,10 +135,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     }
   </script>
   <style>
-    body { background-color: #0b0f19; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: #0b0f19; color: #f8fafc; font-family: 'Vazirmatn', system-ui, -apple-system, sans-serif; }
+    html[dir="ltr"] body { font-family: system-ui, -apple-system, sans-serif; }
   </style>
 </head>
-<body class="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col items-center p-4 md:p-8">
+<body class="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col items-center p-4 md:p-8 transition-all">
   <div class="max-w-4xl w-full space-y-6">
     
     <!-- Header -->
@@ -146,23 +151,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           </div>
           <div>
             <h1 class="text-2xl font-black tracking-tight text-white flex items-center gap-2">
-              Safe-Telegram-MCP
-              <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">Hardened</span>
+              <span>Safe-Telegram-MCP</span>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium" id="badgeHardened">امن‌سازی شده</span>
             </h1>
-            <p class="text-xs text-slate-400">Zero-Leak Chat Whitelisting & Anti-Flood Ban Protection</p>
+            <p class="text-xs text-slate-400" id="headerSubtitle">لیست سفید چت‌ها، جلوگیری از نشت داده و ضدبن هوشمند تلگرام</p>
           </div>
         </div>
       </div>
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <button onclick="toggleLang()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-colors">
+          🌐 <span id="langBtnText">English</span>
+        </button>
         <button onclick="openCredentialsModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-colors">
-          <span>🔑</span> API Keys
+          <span>🔑</span> <span id="btnApiKeys">کلیدهای API</span>
         </button>
         <button onclick="openQrModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs font-semibold transition-colors">
-          <span>📲</span> QR Login
+          <span>📲</span> <span id="btnQrLogin">ورود QR</span>
         </button>
-        <div id="statusBadge" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-medium">
+        <div id="statusBadge" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-medium">
           <span class="w-2.5 h-2.5 rounded-full bg-slate-500 animate-pulse" id="statusDot"></span>
-          <span id="statusText">Checking status...</span>
+          <span id="statusText">بررسی وضعیت...</span>
         </div>
       </div>
     </header>
@@ -175,21 +183,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div>
           <div class="flex items-center justify-between mb-3">
             <h2 class="text-lg font-bold text-white flex items-center gap-2">
-              <span>📋</span> Allowed Chats (Whitelist)
+              <span>📋</span> <span id="titleWhitelist">چت‌های مجاز (Whitelist)</span>
             </h2>
             <div class="flex items-center gap-2">
-              <button onclick="exportWhitelist()" title="Export JSON" class="text-xs px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors">
-                ⬇️ Export
+              <button onclick="exportWhitelist()" class="text-xs px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors">
+                ⬇️ <span id="btnExport">خروجی</span>
               </button>
-              <label title="Import JSON" class="text-xs px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 cursor-pointer transition-colors">
-                ⬆️ Import
+              <label class="text-xs px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 cursor-pointer transition-colors">
+                ⬆️ <span id="btnImport">ورودی</span>
                 <input type="file" id="importFileInput" class="hidden" accept=".json" onchange="importWhitelist(event)">
               </label>
-              <span id="whitelistCount" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-sky-400 border border-slate-700">0 chats</span>
+              <span id="whitelistCount" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-sky-400 border border-slate-700">0 چت</span>
             </div>
           </div>
-          <p class="text-xs text-slate-400 mb-4 leading-relaxed">
-            AI agents can <strong class="text-slate-200">ONLY</strong> read, query, or send to approved targets. All private family chats, banks, and unlisted groups remain invisible and strictly forbidden.
+          <p class="text-xs text-slate-400 mb-4 leading-relaxed" id="descWhitelist">
+            هوش مصنوعی <strong class="text-slate-200">فقط</strong> به چت‌های این لیست دسترسی دارد. کلیه پیام‌های شخصی، خانوادگی، بانکی و سایر گروه‌ها کاملاً مسدود و غیرقابل خواندن هستند.
           </p>
 
           <!-- Add chat form -->
@@ -197,39 +205,39 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <input 
               id="newChatInput" 
               type="text" 
-              placeholder="e.g. me, @mychannel, or 12345678" 
+              placeholder="مثال: me یا mychannel@ یا 12345678" 
               class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-sky-500 text-white placeholder-slate-500 transition-colors"
               onkeydown="if(event.key==='Enter') addChat()"
             />
             <button 
               onclick="addChat()" 
-              class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-sm transition-colors shadow-lg shadow-sky-500/10">
-              Add
+              class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-sm transition-colors shadow-lg shadow-sky-500/10" id="btnAdd">
+              افزودن
             </button>
           </div>
 
           <!-- List -->
           <ul id="whitelistContainer" class="space-y-2 max-h-64 overflow-y-auto pr-1">
-            <li class="text-xs text-slate-500 py-3 text-center">Loading allowed chats...</li>
+            <li class="text-xs text-slate-500 py-3 text-center" id="loadingChats">در حال بارگذاری چت‌های مجاز...</li>
           </ul>
         </div>
         
-        <div class="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-500">
-          💡 Tip: Use <code class="text-sky-400 font-mono">me</code> to restrict AI to your own <em>Saved Messages</em>.
+        <div class="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-500" id="tipSavedMessages">
+          💡 نکته: با افزودن <code class="text-sky-400 font-mono">me</code> هوش مصنوعی فقط به <em>پیام‌های ذخیره‌شده (Saved Messages)</em> دسترسی خواهد داشت.
         </div>
       </section>
 
       <!-- Security & Anti-Flood Controls -->
       <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
         <h2 class="text-lg font-bold text-white flex items-center gap-2">
-          <span>⚙️</span> Security & Anti-Flood Policies
+          <span>⚙️</span> <span id="titlePolicies">سیاست‌های امنیتی و ضدبن</span>
         </h2>
 
         <!-- Safe Mode Toggle -->
         <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800/80">
           <div>
-            <div class="font-semibold text-sm text-slate-200">Safe Mode Protection</div>
-            <div class="text-xs text-slate-400">Enforces whitelist barriers & rate controls</div>
+            <div class="font-semibold text-sm text-slate-200" id="optSafeMode">حالت امن (Safe Mode)</div>
+            <div class="text-xs text-slate-400" id="descSafeMode">اجبار محدودیت‌های لیست سفید و تاخیر ضداسپم</div>
           </div>
           <label class="relative inline-flex items-center cursor-pointer">
             <input id="toggleSafeMode" type="checkbox" class="sr-only peer" onchange="saveConfig()">
@@ -240,8 +248,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <!-- Read Only Toggle -->
         <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800/80">
           <div>
-            <div class="font-semibold text-sm text-slate-200">Read-Only Mode</div>
-            <div class="text-xs text-slate-400">Blocks sending messages, edits, or deletes</div>
+            <div class="font-semibold text-sm text-slate-200" id="optReadOnly">حالت فقط خواندنی (Read-Only)</div>
+            <div class="text-xs text-slate-400" id="descReadOnly">مسدودسازی کامل ارسال، ویرایش یا حذف پیام‌ها</div>
           </div>
           <label class="relative inline-flex items-center cursor-pointer">
             <input id="toggleReadOnly" type="checkbox" class="sr-only peer" onchange="saveConfig()">
@@ -252,8 +260,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <!-- Anti-Peer Flood -->
         <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800/80">
           <div>
-            <div class="font-semibold text-sm text-slate-200">Anti-Peer Flood Guard</div>
-            <div class="text-xs text-slate-400">Blocks sending messages to non-contact strangers</div>
+            <div class="font-semibold text-sm text-slate-200" id="optPeerFlood">مهار پیام به غریبه‌ها (Anti-Peer Flood)</div>
+            <div class="text-xs text-slate-400" id="descPeerFlood">جلوگیری از ارسال پیام به شماره‌های خارج از مخاطبین</div>
           </div>
           <label class="relative inline-flex items-center cursor-pointer">
             <input id="togglePeerFlood" type="checkbox" class="sr-only peer" onchange="saveConfig()">
@@ -264,7 +272,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <!-- Rate Limit Slider -->
         <div class="space-y-2 p-3.5 rounded-xl bg-slate-950 border border-slate-800/80">
           <div class="flex justify-between items-center">
-            <span class="text-sm font-semibold text-slate-200">Request Pacing (Delay)</span>
+            <span class="text-sm font-semibold text-slate-200" id="optDelay">وقفه بین درخواست‌ها (Delay)</span>
             <span id="rateLimitLabel" class="text-xs font-mono font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">1.5s</span>
           </div>
           <input 
@@ -279,9 +287,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             onchange="saveConfig()"
           />
           <div class="text-[11px] text-slate-400 flex justify-between pt-1">
-            <span>Aggressive (0.5s)</span>
-            <span class="text-sky-400 font-semibold">Recommended (1.5s - 2.0s)</span>
-            <span>Ultra-Safe (5.0s)</span>
+            <span id="labelAggressive">سریع (0.5s)</span>
+            <span class="text-sky-400 font-semibold" id="labelRecommended">پیشنهادی (1.5s - 2.0s)</span>
+            <span id="labelUltraSafe">فوق امن (5.0s)</span>
           </div>
         </div>
 
@@ -292,23 +300,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-3">
       <div class="flex items-center gap-2">
         <span class="text-sky-400 text-lg">📊</span>
-        <h3 class="text-base font-bold text-white">Why These Rate Limits? (MTProto & Telethon Official Guidelines)</h3>
+        <h3 class="text-base font-bold text-white" id="titleDocWhy">چرا این اعداد لیمیت؟ (مستندات رسمی MTProto و Telethon)</h3>
       </div>
-      <p class="text-xs text-slate-300 leading-relaxed">
-        Telegram’s spam defense monitors MTProto socket calls closely. Based on Telethon empirical benchmarks:
+      <p class="text-xs text-slate-300 leading-relaxed" id="descDocWhy">
+        سیستم هوشمند ضداسپم تلگرام فرکانس درخواست‌های ارسالی کلاینت را رصد می‌کند:
       </p>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs pt-1">
         <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
-          <div class="font-bold text-sky-400 mb-1">⏱️ 1.5s - 2.0s Delay</div>
-          <div class="text-slate-400">Telegram soft-throttles user clients exceeding ~25-30 requests/min. A 1.5s delay keeps throughput safely under ~40 calls/min without triggering FloodWait.</div>
+          <div class="font-bold text-sky-400 mb-1" id="box1Title">⏱️ وقفه ۱.۵ الی ۲.۰ ثانیه</div>
+          <div class="text-slate-400" id="box1Text">تلگرام ارسال بیش از ۲۵-۳۰ درخواست در دقیقه را محدود و خطای FloodWait صادر می‌کند. وقفه ۱.۵s اجرای امن زیر ۴۰ درخواست در دقیقه را تضمین می‌کند.</div>
         </div>
         <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
-          <div class="font-bold text-emerald-400 mb-1">📦 Max 50 Messages/Query</div>
-          <div class="text-slate-400">Fetching chunks greater than 50-100 messages triggers internal heavy-query checks on Telegram servers. The server automatically clamps batch sizes to 50.</div>
+          <div class="font-bold text-emerald-400 mb-1" id="box2Title">📦 سقف ۵۰ پیام در هر نوبت</div>
+          <div class="text-slate-400" id="box2Text">درخواست بیش از ۵۰ تا ۱۰۰ پیام در هر کوئری موجب فعال شدن فیلتر بار سنگین سرور می‌شود. سرور این ابزار سقف دریافت را روی ۵۰ قفل کرده است.</div>
         </div>
         <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
-          <div class="font-bold text-amber-400 mb-1">🚫 Non-Contact Messaging</div>
-          <div class="text-slate-400">Initiating chats with more than 5-10 non-contact users per day triggers Telegram’s automated SpamBlocker. The anti-peer-flood guard blocks this behavior.</div>
+          <div class="font-bold text-amber-400 mb-1" id="box3Title">🚫 عدم پیام به افراد ناشناس</div>
+          <div class="text-slate-400" id="box3Text">شروع مکالمه با بیش از ۵ الی ۱۰ فرد خارج از مخاطبین در روز باعث فعال شدن خودکار SpamBlocker تلگرام می‌شود. گارد ابزار این قابلیت را مهار می‌کند.</div>
         </div>
       </div>
     </section>
@@ -318,7 +326,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <div class="flex items-center justify-between cursor-pointer" onclick="togglePlaybook()">
         <div class="flex items-center gap-2">
           <span class="text-rose-400 text-lg">🚨</span>
-          <h3 class="text-base font-bold text-white">Account Restriction & Ban Recovery Playbook</h3>
+          <h3 class="text-base font-bold text-white" id="titlePlaybook">راهنمای مواقع محدودیت یا بن شدن تلگرام (Recovery Playbook)</h3>
         </div>
         <span id="playbookChevron" class="text-slate-400 text-sm transform transition-transform">▼</span>
       </div>
@@ -326,28 +334,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <div id="playbookBody" class="space-y-4 text-xs text-slate-300 border-t border-slate-800 pt-4">
         
         <div>
-          <h4 class="font-bold text-amber-400 text-sm mb-1">1. Temporary FloodWait (<code>FloodWaitError: A wait of X seconds is required</code>)</h4>
-          <p class="text-slate-400 leading-relaxed">
-            • <strong>What it is:</strong> A temporary cooldown penalty imposed by Telegram for sending too many requests too fast.<br>
-            • <strong>Solution:</strong> <span class="text-rose-300 font-semibold">DO NOT SPAM RETRY!</span> Retrying within the wait window doubles or resets the timer. Wait out the exact number of seconds. Safe-Telegram-MCP automatically pauses and respects this limit.
+          <h4 class="font-bold text-amber-400 text-sm mb-1" id="pb1Title">۱. خطای موقت FloodWait (مانند FloodWaitError: A wait of X seconds is required)</h4>
+          <p class="text-slate-400 leading-relaxed" id="pb1Text">
+            • <strong>ماهیت:</strong> جریمه زمانی موقت تلگرام به دلیل ارسال رگباری درخواست‌ها.<br>
+            • <strong>راهکار حیاتی:</strong> <span class="text-rose-300 font-semibold">به هیچ وجه تلاش مجدد نکنید!</span> هر تلاش مجدد در زمان وقفه، ثانیه‌شمار تلگرام را دو برابر یا ریست می‌کند. فقط تا پایان ثانیه‌ها صبر کنید. سیستم ابزار خودکار این زمان را مدیریت می‌کند.
           </p>
         </div>
 
         <div>
-          <h4 class="font-bold text-amber-400 text-sm mb-1">2. Muted / SpamBlock (<code>PeerFloodError</code>: Cannot message strangers)</h4>
-          <p class="text-slate-400 leading-relaxed">
-            • <strong>What it is:</strong> Account is temporarily restricted from messaging non-contacts because someone reported spam or an automated threshold was crossed.<br>
-            • <strong>Solution:</strong> Open Telegram, search for official <a href="https://t.me/SpamBot" target="_blank" class="text-sky-400 underline font-mono">@SpamBot</a>, click <em>Start</em>. Select <em>"This is a mistake"</em> → <em>"I never send unsolicited messages"</em>. First-time restrictions are typically lifted automatically within 24 to 48 hours.
+          <h4 class="font-bold text-amber-400 text-sm mb-1" id="pb2Title">۲. میوت یا ریپورت اسپم (PeerFloodError: عدم امکان ارسال پیام به غریبه‌ها)</h4>
+          <p class="text-slate-400 leading-relaxed" id="pb2Text">
+            • <strong>ماهیت:</strong> اکانت موقتاً از ارسال پیام به افراد ناشناس منع شده است.<br>
+            • <strong>راهکار:</strong> وارد ربات رسمی <a href="https://t.me/SpamBot" target="_blank" class="text-sky-400 underline font-mono">SpamBot@</a> شوید، دستور <em>Start/</em> را بزنید و گزینه‌های <em>"This is a mistake"</em> و <em>"I never send unsolicited messages"</em> را بزنید. محدودیت اول معمولاً ظرف ۲۴ الی ۴۸ ساعت خودکار رفع می‌شود.
           </p>
         </div>
 
         <div>
-          <h4 class="font-bold text-rose-400 text-sm mb-1">3. Full Account Ban (<code>PHONE_NUMBER_BANNED</code>)</h4>
-          <p class="text-slate-400 leading-relaxed">
-            • <strong>Official Recovery Email:</strong> Send an email to <code class="text-sky-400 bg-slate-950 px-1 py-0.5 rounded">recover@telegram.org</code> and <code class="text-sky-400 bg-slate-950 px-1 py-0.5 rounded">login@telegram.org</code>.<br>
-            • <strong>Subject:</strong> <code class="text-slate-200 bg-slate-950 px-1.5 py-0.5 rounded">Banned phone number: +[country_code][number]</code><br>
-            • <strong>Message template:</strong> <em>"Hello Telegram Support Team. My phone number (+[country_code][number]) was banned unexpectedly. I was using a local MTProto development client on my personal workstation. I never engaged in spam, unsolicited messaging, or violations of Terms of Service. Please review and restore my account."</em><br>
-            • <strong>Additional Support:</strong> Tweet to <a href="https://twitter.com/smstelegram" target="_blank" class="text-sky-400 underline">@smstelegram</a> or <a href="https://twitter.com/telegram" target="_blank" class="text-sky-400 underline">@Telegram</a> on X, or submit a report at <a href="https://telegram.org/support" target="_blank" class="text-sky-400 underline font-mono">telegram.org/support</a>.
+          <h4 class="font-bold text-rose-400 text-sm mb-1" id="pb3Title">۳. مسدودی کامل شماره (PHONE_NUMBER_BANNED)</h4>
+          <p class="text-slate-400 leading-relaxed" id="pb3Text">
+            • <strong>ایمیل رسمی رفع مسدودی:</strong> ارسال ایمیل به <code class="text-sky-400 bg-slate-950 px-1 py-0.5 rounded">recover@telegram.org</code> و <code class="text-sky-400 bg-slate-950 px-1 py-0.5 rounded">login@telegram.org</code>.<br>
+            • <strong>موضوع ایمیل:</strong> <code class="text-slate-200 bg-slate-950 px-1.5 py-0.5 rounded">Banned phone number: +98XXXXXXXXXX</code><br>
+            • <strong>متن استاندارد:</strong> <em>"Hello Telegram Support Team. My phone number was banned unexpectedly. I was using a local MTProto development client on my personal workstation. I never engaged in spam or violations of Terms of Service. Please review and restore my account."</em><br>
+            • <strong>پیگیری تکمیلی:</strong> ارسال تیکت در <a href="https://telegram.org/support" target="_blank" class="text-sky-400 underline font-mono">telegram.org/support</a> و پیام به اکانت‌های رسمی <a href="https://twitter.com/smstelegram" target="_blank" class="text-sky-400 underline">smstelegram@</a> یا <a href="https://twitter.com/telegram" target="_blank" class="text-sky-400 underline">Telegram@</a> در توییتر/ایکس.
           </p>
         </div>
 
@@ -356,7 +364,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <!-- Footer -->
     <footer class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 text-xs text-slate-400 flex flex-col md:flex-row justify-between items-center gap-2">
-      <div>Settings automatically saved to <code class="text-sky-400 bg-slate-950 px-1.5 py-0.5 rounded">safe_config.json</code></div>
+      <div id="footerSaved">تنظیمات خودکار در فایل <code class="text-sky-400 bg-slate-950 px-1.5 py-0.5 rounded font-mono">safe_config.json</code> ذخیره می‌شوند.</div>
       <div>Safe-Telegram-MCP • Hardened Edition</div>
     </footer>
 
@@ -365,32 +373,32 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <!-- API Keys Modal -->
   <div id="credentialsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
-      <button onclick="closeCredentialsModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">✕</button>
+      <button onclick="closeCredentialsModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white text-lg">✕</button>
       
       <h3 class="text-lg font-bold text-white flex items-center gap-2">
-        <span>🔑</span> Telegram API Credentials
+        <span>🔑</span> <span id="modalApiTitle">کلیدهای API تلگرام</span>
       </h3>
-      <p class="text-xs text-slate-400">
-        Get your free API ID and Hash from <a href="https://my.telegram.org/apps" target="_blank" class="text-sky-400 underline">my.telegram.org/apps</a>:
+      <p class="text-xs text-slate-400" id="modalApiDesc">
+        شناسه و هش برنامه خود را رایگان از <a href="https://my.telegram.org/apps" target="_blank" class="text-sky-400 underline">my.telegram.org/apps</a> دریافت کنید:
       </p>
 
       <div class="space-y-3 pt-2">
         <div>
           <label class="text-xs font-semibold text-slate-300 block mb-1">TELEGRAM_API_ID</label>
-          <input id="apiIdInput" type="text" placeholder="e.g. 1234567" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+          <input id="apiIdInput" type="text" placeholder="مثال: 1234567" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500 font-mono">
         </div>
         <div>
           <label class="text-xs font-semibold text-slate-300 block mb-1">TELEGRAM_API_HASH</label>
-          <input id="apiHashInput" type="text" placeholder="e.g. 0123456789abcdef0123456789abcdef" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+          <input id="apiHashInput" type="text" placeholder="مثال: 0123456789abcdef0123456789abcdef" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500 font-mono">
         </div>
       </div>
 
       <div class="flex justify-end gap-2 pt-2">
-        <button onclick="closeCredentialsModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">
-          Cancel
+        <button onclick="closeCredentialsModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs" id="btnCancelApi">
+          انصراف
         </button>
-        <button onclick="saveCredentials()" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-colors">
-          Save Credentials
+        <button onclick="saveCredentials()" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-colors" id="btnSaveApi">
+          ذخیره کلیدها
         </button>
       </div>
     </div>
@@ -399,29 +407,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <!-- QR Login Modal -->
   <div id="qrModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative text-center">
-      <button onclick="closeQrModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">✕</button>
+      <button onclick="closeQrModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white text-lg">✕</button>
       
       <h3 class="text-lg font-bold text-white flex items-center justify-center gap-2">
-        <span>📲</span> Link Telegram Device
+        <span>📲</span> <span id="modalQrTitle">اتصال به تلگرام با QR</span>
       </h3>
-      <p class="text-xs text-slate-400">
-        Scan the QR code using your official Telegram app:
+      <p class="text-xs text-slate-400 leading-relaxed" id="modalQrDesc">
+        کد QR را با اپلیکیشن تلگرام در گوشی خود اسکن کنید:
         <br><strong class="text-slate-200">Settings > Devices > Link Desktop Device</strong>
       </p>
 
       <div id="qrContainer" class="p-4 bg-white rounded-xl flex items-center justify-center min-h-[220px]">
-        <div id="qrSpinner" class="text-xs text-slate-600 animate-pulse">Initializing MTProto session...</div>
+        <div id="qrSpinner" class="text-xs text-slate-600 animate-pulse">در حال برقراری ارتباط با MTProto...</div>
         <img id="qrImage" class="hidden w-52 h-52 mx-auto" alt="Scan QR" />
       </div>
 
-      <div id="qrStatusText" class="text-xs text-slate-400">Waiting for scan...</div>
+      <div id="qrStatusText" class="text-xs text-slate-400">منتظر اسکن...</div>
 
       <div class="flex gap-2 justify-center">
-        <button onclick="startQrAuth()" class="px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-colors">
-          Refresh QR
+        <button onclick="startQrAuth()" class="px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-colors" id="btnRefreshQr">
+          تازه کردن QR
         </button>
-        <button onclick="closeQrModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors">
-          Cancel
+        <button onclick="closeQrModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors" id="btnCancelQr">
+          بستن
         </button>
       </div>
     </div>
@@ -430,6 +438,102 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <script>
     let currentConfig = {};
     let qrPollInterval = null;
+    let currentLang = localStorage.getItem('safe_telegram_lang') || 'fa';
+
+    const I18N = {
+      fa: {
+        badgeHardened: "امن‌سازی شده",
+        headerSubtitle: "لیست سفید چت‌ها، جلوگیری از نشت داده و ضدبن هوشمند تلگرام",
+        langBtnText: "English",
+        btnApiKeys: "کلیدهای API",
+        btnQrLogin: "ورود QR",
+        titleWhitelist: "چت‌های مجاز (Whitelist)",
+        btnExport: "خروجی",
+        btnImport: "ورودی",
+        descWhitelist: "هوش مصنوعی فقط به چت‌های این لیست دسترسی دارد. کلیه پیام‌های شخصی، خانوادگی، بانکی و سایر گروه‌ها کاملاً مسدود و غیرقابل خواندن هستند.",
+        btnAdd: "افزودن",
+        tipSavedMessages: "💡 نکته: با افزودن me هوش مصنوعی فقط به پیام‌های ذخیره‌شده (Saved Messages) دسترسی خواهد داشت.",
+        titlePolicies: "سیاست‌های امنیتی و ضدبن",
+        optSafeMode: "حالت امن (Safe Mode)",
+        descSafeMode: "اجبار محدودیت‌های لیست سفید و تاخیر ضداسپم",
+        optReadOnly: "حالت فقط خواندنی (Read-Only)",
+        descReadOnly: "مسدودسازی کامل ارسال، ویرایش یا حذف پیام‌ها",
+        optPeerFlood: "مهار پیام به غریبه‌ها (Anti-Peer Flood)",
+        descPeerFlood: "جلوگیری از ارسال پیام به شماره‌های خارج از مخاطبین",
+        optDelay: "وقفه بین درخواست‌ها (Delay)",
+        labelAggressive: "سریع (0.5s)",
+        labelRecommended: "پیشنهادی (1.5s - 2.0s)",
+        labelUltraSafe: "فوق امن (5.0s)",
+        placeholderInput: "مثال: me یا mychannel@ یا 12345678",
+        statusConnected: "تلگرام متصل شد",
+        statusApiSet: "کلیدها ثبت شد (اسکن QR)",
+        statusMissingApi: "ثبت کلیدهای API",
+        chatSingular: "چت",
+        chatPlural: "چت",
+        noChats: "هنوز چتی به لیست مجاز اضافه نشده است.",
+      },
+      en: {
+        badgeHardened: "Hardened",
+        headerSubtitle: "Zero-Leak Chat Whitelisting & Anti-Flood Ban Protection",
+        langBtnText: "فارسی",
+        btnApiKeys: "API Keys",
+        btnQrLogin: "QR Login",
+        titleWhitelist: "Allowed Chats (Whitelist)",
+        btnExport: "Export",
+        btnImport: "Import",
+        descWhitelist: "AI agents can ONLY read, query, or send to approved targets. All private family chats, banks, and unlisted groups remain invisible and strictly forbidden.",
+        btnAdd: "Add",
+        tipSavedMessages: "💡 Tip: Use me to restrict AI exclusively to your own Saved Messages.",
+        titlePolicies: "Security & Anti-Flood Policies",
+        optSafeMode: "Safe Mode Protection",
+        descSafeMode: "Enforces whitelist barriers & rate controls",
+        optReadOnly: "Read-Only Mode",
+        descReadOnly: "Blocks sending messages, edits, or deletes",
+        optPeerFlood: "Anti-Peer Flood Guard",
+        descPeerFlood: "Blocks sending messages to non-contact strangers",
+        optDelay: "Request Pacing (Delay)",
+        labelAggressive: "Aggressive (0.5s)",
+        labelRecommended: "Recommended (1.5s - 2.0s)",
+        labelUltraSafe: "Ultra-Safe (5.0s)",
+        placeholderInput: "e.g. me, @mychannel, or 12345678",
+        statusConnected: "Telegram Connected",
+        statusApiSet: "API Keys Set (Scan QR)",
+        statusMissingApi: "Set API Keys",
+        chatSingular: "chat",
+        chatPlural: "chats",
+        noChats: "No chats whitelisted yet.",
+      }
+    };
+
+    function applyLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('safe_telegram_lang', lang);
+      const dict = I18N[lang];
+      const html = document.documentElement;
+
+      if (lang === 'fa') {
+        html.setAttribute('dir', 'rtl');
+        html.setAttribute('lang', 'fa');
+      } else {
+        html.setAttribute('dir', 'ltr');
+        html.setAttribute('lang', 'en');
+      }
+
+      for (const [key, val] of Object.entries(dict)) {
+        const el = document.getElementById(key);
+        if (el) el.textContent = val;
+      }
+
+      const input = document.getElementById('newChatInput');
+      if (input) input.placeholder = dict.placeholderInput;
+
+      renderWhitelist(currentConfig.allowed_chats || []);
+      loadStatus();
+    }
+
+    function toggleLang() {
+      applyLanguage(currentLang === 'fa' ? 'en' : 'fa');
+    }
 
     function togglePlaybook() {
       const body = document.getElementById('playbookBody');
@@ -456,7 +560,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       const apiHash = document.getElementById('apiHashInput').value.trim();
 
       if (!apiId || !apiHash) {
-        alert('Please provide both API ID and API Hash.');
+        alert(currentLang === 'fa' ? 'لطفاً هر دو مقدار API ID و API Hash را وارد کنید.' : 'Please provide both API ID and API Hash.');
         return;
       }
 
@@ -470,10 +574,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         if (data.status === 'ok') {
           closeCredentialsModal();
           loadStatus();
-          alert('Credentials saved successfully to .env!');
+          alert(currentLang === 'fa' ? 'کلیدها با موفقیت در فایل .env ذخیره شدند!' : 'Credentials saved successfully to .env!');
         }
       } catch (err) {
-        alert('Error saving credentials: ' + err);
+        alert('Error: ' + err);
       }
     }
 
@@ -501,21 +605,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         const data = await res.json();
         const dot = document.getElementById('statusDot');
         const text = document.getElementById('statusText');
+        const dict = I18N[currentLang];
 
         if (data.api_id) document.getElementById('apiIdInput').value = data.api_id;
         if (data.api_hash) document.getElementById('apiHashInput').value = data.api_hash;
 
         if (data.configured) {
           dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50";
-          text.textContent = "Telegram Connected";
+          text.textContent = dict.statusConnected;
           text.className = "text-emerald-300";
         } else if (data.has_api_credentials) {
           dot.className = "w-2.5 h-2.5 rounded-full bg-sky-400";
-          text.textContent = "API Keys Set (Scan QR)";
+          text.textContent = dict.statusApiSet;
           text.className = "text-sky-300";
         } else {
           dot.className = "w-2.5 h-2.5 rounded-full bg-amber-400";
-          text.textContent = "Set API Keys";
+          text.textContent = dict.statusMissingApi;
           text.className = "text-amber-300";
         }
       } catch {
@@ -526,10 +631,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     function renderWhitelist(chats) {
       const container = document.getElementById('whitelistContainer');
       const countLabel = document.getElementById('whitelistCount');
-      countLabel.textContent = chats.length + ' chat' + (chats.length === 1 ? '' : 's');
+      const dict = I18N[currentLang];
+      const countText = chats.length === 1 ? dict.chatSingular : dict.chatPlural;
+      countLabel.textContent = chats.length + ' ' + countText;
 
       if (!chats.length) {
-        container.innerHTML = '<li class="text-xs text-slate-500 py-3 text-center border border-dashed border-slate-800 rounded-lg">No chats whitelisted yet.</li>';
+        container.innerHTML = `<li class="text-xs text-slate-500 py-3 text-center border border-dashed border-slate-800 rounded-lg">${dict.noChats}</li>`;
         return;
       }
 
@@ -537,7 +644,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <li class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors">
           <div class="flex items-center gap-2">
             <span class="text-xs text-sky-400">${chat === 'me' ? '💬' : '📌'}</span>
-            <span class="text-sm font-mono text-slate-200">${chat === 'me' ? 'me (Saved Messages)' : chat}</span>
+            <span class="text-sm font-mono text-slate-200">${chat === 'me' ? (currentLang === 'fa' ? 'me (پیام‌های ذخیره‌شده)' : 'me (Saved Messages)') : chat}</span>
           </div>
           <button onclick="removeChat('${chat}')" class="text-xs text-slate-500 hover:text-rose-400 p-1 rounded transition-colors">
             ✕
@@ -558,10 +665,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           body: JSON.stringify({ chat: val })
         });
         const updated = await res.json();
+        currentConfig.allowed_chats = updated.allowed_chats;
         renderWhitelist(updated.allowed_chats);
         input.value = '';
       } catch (err) {
-        alert('Failed to add chat: ' + err);
+        alert('Failed: ' + err);
       }
     }
 
@@ -573,9 +681,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           body: JSON.stringify({ chat })
         });
         const updated = await res.json();
+        currentConfig.allowed_chats = updated.allowed_chats;
         renderWhitelist(updated.allowed_chats);
       } catch (err) {
-        alert('Failed to remove chat: ' + err);
+        alert('Failed: ' + err);
       }
     }
 
@@ -621,10 +730,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             body: JSON.stringify({ allowed_chats: chats })
           });
           const updated = await res.json();
+          currentConfig.allowed_chats = updated.allowed_chats;
           renderWhitelist(updated.allowed_chats);
-          alert('Whitelist imported successfully!');
+          alert(currentLang === 'fa' ? 'لیست سفید با موفقیت بارگذاری شد!' : 'Whitelist imported successfully!');
         } catch (err) {
-          alert('Failed to import whitelist: ' + err.message);
+          alert('Error: ' + err.message);
         }
       };
       reader.readAsText(file);
@@ -649,9 +759,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       const statusText = document.getElementById('qrStatusText');
 
       spinner.classList.remove('hidden');
-      spinner.textContent = "Connecting to Telegram MTProto...";
+      spinner.textContent = currentLang === 'fa' ? "در حال اتصال به MTProto..." : "Connecting to Telegram MTProto...";
       img.classList.add('hidden');
-      statusText.textContent = "Generating secure QR code...";
+      statusText.textContent = currentLang === 'fa' ? "در حال تولید کد QR امن..." : "Generating secure QR code...";
 
       if (qrPollInterval) clearInterval(qrPollInterval);
 
@@ -674,12 +784,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           img.src = data.qr_data_uri;
           img.classList.remove('hidden');
           spinner.classList.add('hidden');
-          statusText.textContent = "Scan with your phone before expiry (" + (data.expires_at || '') + ")";
+          statusText.textContent = (currentLang === 'fa' ? "کد را با تلگرام گوشی قبل از انقضا اسکن کنید: " : "Scan with phone before expiry: ") + (data.expires_at || '');
 
           qrPollInterval = setInterval(pollQrStatus, 2000);
         }
       } catch (err) {
-        spinner.textContent = "Failed to start QR auth: " + err;
+        spinner.textContent = "Error: " + err;
       }
     }
 
@@ -692,13 +802,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         if (data.status === 'authenticated') {
           clearInterval(qrPollInterval);
           statusText.className = "text-xs font-bold text-emerald-400";
-          statusText.textContent = "✅ Successfully Authenticated! Session saved to .env.";
+          statusText.textContent = currentLang === 'fa' ? "✅ ورود موفقیت‌آمیز بود! نشست در فایل .env ذخیره شد." : "✅ Successfully Authenticated! Session saved to .env.";
           setTimeout(() => {
             closeQrModal();
             loadStatus();
           }, 2000);
         } else if (data.status === 'expired') {
-          statusText.textContent = "QR expired. Click Refresh QR.";
+          statusText.textContent = currentLang === 'fa' ? "کد QR منقضی شد. روی تازه کردن کلیک کنید." : "QR expired. Click Refresh QR.";
           clearInterval(qrPollInterval);
         } else if (data.status === 'error') {
           statusText.textContent = "Error: " + data.message;
@@ -709,6 +819,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       }
     }
 
+    applyLanguage(currentLang);
     loadConfig();
     loadStatus();
   </script>

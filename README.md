@@ -44,17 +44,18 @@ Standard Telegram MCP integrations connect AI models (Claude, Cursor, Codex) dir
 ### 3. 🔒 Read-Only Guard
 - Toggle a single switch to convert the entire server into a strictly non-destructive information-retrieval engine. All message posting, editing, deletion, and administrative actions are blocked instantly.
 
-### 4. 🖥️ Local Web Dashboard (`--ui`)
+### 4. 🖥️ Local Bilingual Web Dashboard (`--ui`)
 - Manage your configuration effortlessly via a clean, dark-mode browser interface (with automatic free port allocation).
+- **Bilingual Interface:** Instant toggle between English and Persian (with native Vazirmatn typography and RTL layout).
 - Add and remove whitelisted chats in real time without editing JSON or `.env` files.
 - Visual status indicator showing Telegram credentials and interactive in-browser QR login.
 
 ```bash
-# 🚀 1-Step Install & Launch:
+# 🚀 1-Step Fresh Install & Launch:
 git clone https://github.com/ketabchi-ar/Safe-Telegram-MCP.git && cd Safe-Telegram-MCP && ./install.sh
 
-# Or launch directly anytime:
-uv run python main.py --ui
+# 🔄 1-Step Update & Launch:
+cd ~/Safe-Telegram-MCP && git pull origin main && ./install.sh
 ```
 
 ---
