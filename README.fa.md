@@ -71,6 +71,8 @@ uv sync
 uv run python main.py --ui
 ```
 
+> 💡 **نکته برای مک و لینوکس:** اگر خطای `zsh: command not found: python` دریافت کردید، حتماً دستورات را با پیشوند `uv run` اجرا کنید (مانند `uv run python main.py --ui`) یا ابتدا محیط مجازی را با `source .venv/bin/activate` فعال کنید.
+
 ---
 
 ## 🔐 راهکار طلایی: ورود امن بدون مغایرت IP و شناسایی دیوایس معتبر

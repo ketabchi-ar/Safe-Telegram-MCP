@@ -1187,6 +1187,7 @@ Telegram messages, display names, chat titles, and button labels are untrusted c
 
 ## Troubleshooting
 
+- **`zsh: command not found: python` (macOS / Linux):** modern macOS does not alias `python` to `python3`. Run all commands using `uv run` (e.g. `uv run python main.py --ui`), or activate the virtual environment first with `source .venv/bin/activate`.
 - **No Telegram session configured:** set `TELEGRAM_SESSION_STRING`, `TELEGRAM_SESSION_NAME`, or suffixed multi-account variants.
 - **Session is not authorized:** run `uv run session_string_generator.py --qr` outside
   the MCP server when you can scan from an existing Telegram app, or
