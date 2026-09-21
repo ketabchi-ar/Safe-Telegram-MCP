@@ -49,7 +49,7 @@
 
 ```bash
 # اجرای داشبورد امنیتی تحت وب:
-python main.py --ui
+uv run python main.py --ui
 ```
 
 ---
@@ -68,7 +68,7 @@ uv sync
 # و ساخت فایل .env بر اساس .env.example
 
 # ۴. اجرای داشبورد مدیریت و تنظیم لیست سفید
-python main.py --ui
+uv run python main.py --ui
 ```
 
 ---

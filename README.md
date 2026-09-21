@@ -51,7 +51,7 @@ Standard Telegram MCP integrations connect AI models (Claude, Cursor, Codex) dir
 
 ```bash
 # Launch the Web Management Dashboard:
-python main.py --ui
+uv run python main.py --ui
 # or using the CLI command:
 safe-telegram-panel
 ```
