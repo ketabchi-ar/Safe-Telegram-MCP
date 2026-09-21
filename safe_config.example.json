@@ -1,0 +1,11 @@
+{
+  "safe_mode": true,
+  "read_only": false,
+  "rate_limit_delay": 1.5,
+  "max_messages_limit": 50,
+  "allowed_chats": [
+    "me"
+  ],
+  "prevent_peer_flood": true,
+  "strict_whitelist": false
+}

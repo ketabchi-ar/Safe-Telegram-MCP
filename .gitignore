@@ -181,6 +181,7 @@ cython_debug/
 # Telegram session files
 *.session
 *.session-journal
+safe_config.json
 anon.session
 anon.session-journal
 anon_new.session

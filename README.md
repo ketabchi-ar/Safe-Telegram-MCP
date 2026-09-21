@@ -1,9 +1,33 @@
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=200&section=header&text=Telegram%20MCP%20Server&fontSize=50&fontAlignY=35&animation=fadeIn&fontColor=FFFFFF&descAlignY=55&descAlign=62" alt="Telegram MCP Server" width="100%" />
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=200&section=header&text=Safe%20Telegram%20MCP&fontSize=50&fontAlignY=35&animation=fadeIn&fontColor=FFFFFF&descAlignY=55&descAlign=62" alt="Safe Telegram MCP Server" width="100%" />
 </div>
 
+[![DevSponsors](https://img.shields.io/badge/DevSponsors-Verified_OSS-6366f1?style=for-the-badge&logo=github)](https://devsponsors.github.io)
+[![Sponsor](https://img.shields.io/badge/Sponsor-DevSponsors_Hub-emerald?style=for-the-badge&logo=github-sponsors)](https://devsponsors.github.io)
 ![MCP Badge](https://badge.mcpx.dev)
 [![Licence: GPL-3.0-or-later](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue?style=flat-square)](LICENSE)
+
+> 🛡️ **Safe-Telegram-MCP**: Hardened Telegram Model Context Protocol (MCP) server equipped with Chat Whitelisting, Anti-Flood ban protection, Read-Only safety switch, and an interactive Local Web Management Dashboard.
+
+---
+
+## 🛡️ Hardened Security Features
+
+- **📋 Chat Whitelisting (Privacy & Anti-Prompt-Injection):**
+  Prevent AI models from browsing private family chats, financial records, or credentials. Only specifically approved chat IDs/usernames (e.g. `me`, `@my_channel`, `12345678`) can be accessed.
+- **⚡ Anti-Flood & Ban Prevention:**
+  Enforces configurable request pacing and bounded batch queries to eliminate Telegram `FloodWaitError` risks and keep your account safe from spam flags.
+- **🔒 Read-Only Guard:**
+  One toggle blocks all write, edit, delete, or moderation actions. The AI agent can read and analyze whitelisted chats without modifying anything.
+- **🖥️ Local Web Dashboard (`--ui`):**
+  A modern, zero-dependency browser management interface (`http://localhost:8080`) to add/remove whitelisted chats, configure rate limits, and inspect connection status with a single click.
+
+```bash
+# Launch the Web Security Dashboard:
+python main.py --ui
+```
+
+---
 [![Tests](https://github.com/KiaroSama/telegram-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/KiaroSama/telegram-mcp/actions/workflows/tests.yml)
 [![Python Lint & Format Check](https://github.com/KiaroSama/telegram-mcp/actions/workflows/python-lint-format.yml/badge.svg)](https://github.com/KiaroSama/telegram-mcp/actions/workflows/python-lint-format.yml)
 [![M8ven Score](https://m8ven.ai/badge/mcp/kiarosama-telegram-mcp-1sxyic)](https://m8ven.ai/mcp/kiarosama-telegram-mcp-1sxyic)

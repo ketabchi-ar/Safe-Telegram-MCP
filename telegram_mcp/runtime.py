@@ -301,8 +301,10 @@ _install_annotation_hook()
 # a request that wedged left the client waiting for its own idle timeout and
 # then reporting a transport failure for a stalled operation.
 from telegram_mcp.tool_budget import install as _install_tool_budget  # noqa: E402
+from telegram_mcp.security import install_security_guard as _install_security_guard  # noqa: E402
 
 _install_tool_budget(mcp)
+_install_security_guard(mcp)
 
 
 _EXPOSED_TOOLS_MODES = {"all", "read-only"}
