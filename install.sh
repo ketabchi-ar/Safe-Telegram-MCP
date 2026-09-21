@@ -3,7 +3,7 @@ set -e
 
 echo ""
 echo "======================================================"
-echo "   🛡️  Installing Safe-Telegram-MCP (Hardened)      "
+echo "   🛡️  Installing & Launching Safe-Telegram-MCP       "
 echo "======================================================"
 echo ""
 
@@ -49,12 +49,9 @@ fi
 
 echo ""
 echo "======================================================"
-echo "   ✅ Safe-Telegram-MCP successfully installed!       "
+echo "   🚀 Launching Web Security Dashboard...             "
 echo "======================================================"
 echo ""
-echo "Next steps:"
-echo " 1. Configure your TELEGRAM_API_ID and TELEGRAM_API_HASH in .env"
-echo " 2. Launch the Web Security Dashboard:"
-echo "      uv run python main.py --ui"
-echo "    (or open http://localhost:8080 in your browser)"
-echo ""
+
+# Launch web panel automatically
+exec uv run python main.py --ui

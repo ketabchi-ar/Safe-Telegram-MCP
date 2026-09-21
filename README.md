@@ -45,15 +45,16 @@ Standard Telegram MCP integrations connect AI models (Claude, Cursor, Codex) dir
 - Toggle a single switch to convert the entire server into a strictly non-destructive information-retrieval engine. All message posting, editing, deletion, and administrative actions are blocked instantly.
 
 ### 4. 🖥️ Local Web Dashboard (`--ui`)
-- Manage your configuration effortlessly via a clean, dark-mode browser interface at `http://localhost:8080`.
+- Manage your configuration effortlessly via a clean, dark-mode browser interface (with automatic free port allocation).
 - Add and remove whitelisted chats in real time without editing JSON or `.env` files.
-- Visual status indicator showing Telegram credentials and session validity.
+- Visual status indicator showing Telegram credentials and interactive in-browser QR login.
 
 ```bash
-# Launch the Web Management Dashboard:
+# 🚀 1-Step Install & Launch:
+git clone https://github.com/ketabchi-ar/Safe-Telegram-MCP.git && cd Safe-Telegram-MCP && ./install.sh
+
+# Or launch directly anytime:
 uv run python main.py --ui
-# or using the CLI command:
-safe-telegram-panel
 ```
 
 ---

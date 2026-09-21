@@ -1,10 +1,12 @@
 """Safe-Telegram-MCP Web Dashboard.
 
 Provides a user-friendly management interface to:
+- Configure Telegram API Credentials (API ID, API Hash)
 - Toggle Safe Mode and Read-Only Mode
 - Add/Remove whitelisted chats with ease
 - Export and Import whitelisted chats (JSON)
 - Interactive in-browser QR Code Telegram login
+- Automatic free port detection
 - Adjust anti-flood rate limits with MTProto/Telethon documented guidelines
 - Check Telegram connection and session status
 - View account ban recovery and troubleshooting guide
@@ -17,6 +19,9 @@ import base64
 import io
 import json
 import os
+import socket
+import tempfile
+import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -27,6 +32,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 import uvicorn
 import qrcode
+from dotenv import load_dotenv
 
 from telegram_mcp.security import (
     DEFAULT_CONFIG_FILE,
@@ -34,8 +40,10 @@ from telegram_mcp.security import (
     get_security_config,
     update_security_config,
 )
-from session_string_generator import write_env_value
 from telegram_mcp.client_identity import client_identity_kwargs
+
+# Load environment safely without triggering settings.py validation
+load_dotenv()
 
 # Active QR login task state
 _QR_STATE = {
@@ -49,11 +57,55 @@ _QR_STATE = {
 }
 
 
+def _safe_write_env_key(key: str, value: str, env_path: Path = Path(".env")) -> None:
+    """Safely write or update an environment variable in .env without triggering validation."""
+    lines = []
+    if env_path.exists():
+        lines = env_path.read_text(encoding="utf-8").splitlines(keepends=True)
+
+    replaced = False
+    for index, line in enumerate(lines):
+        if line.startswith(f"{key}="):
+            lines[index] = f"{key}={value}\n"
+            replaced = True
+            break
+    if not replaced:
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
+        lines.append(f"{key}={value}\n")
+
+    fd, tmp = tempfile.mkstemp(dir=str(env_path.parent.resolve()), prefix=env_path.name + ".", suffix=".tmp")
+    with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+        handle.write("".join(lines))
+        handle.flush()
+        os.fsync(handle.fileno())
+
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass
+    os.replace(tmp, env_path)
+    os.environ[key] = value
+
+
 def _generate_qr_data_uri(url: str) -> str:
     img = qrcode.make(url)
     buf = io.BytesIO()
     img.save(buf, "PNG")
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def find_available_port(start_port: int = 8080, max_tries: int = 50) -> int:
+    """Find the first open port starting from start_port."""
+    for port in range(start_port, start_port + max_tries):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                s.bind(("127.0.0.1", port))
+                return port
+            except OSError:
+                continue
+    return start_port
 
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -101,9 +153,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           </div>
         </div>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <button onclick="openCredentialsModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-colors">
+          <span>🔑</span> API Keys
+        </button>
         <button onclick="openQrModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs font-semibold transition-colors">
-          <span>📲</span> QR Web Login
+          <span>📲</span> QR Login
         </button>
         <div id="statusBadge" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-medium">
           <span class="w-2.5 h-2.5 rounded-full bg-slate-500 animate-pulse" id="statusDot"></span>
@@ -233,19 +288,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </section>
     </div>
 
-    <!-- Telethon/MTProto Rate Limits Documentation Card -->
+    <!-- Documentation & Guidelines Card -->
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-3">
       <div class="flex items-center gap-2">
         <span class="text-sky-400 text-lg">📊</span>
         <h3 class="text-base font-bold text-white">Why These Rate Limits? (MTProto & Telethon Official Guidelines)</h3>
       </div>
       <p class="text-xs text-slate-300 leading-relaxed">
-        Telegram’s spam defense monitors MTProto socket calls closely. Based on Telethon empirical benchmarks and Telegram API policies:
+        Telegram’s spam defense monitors MTProto socket calls closely. Based on Telethon empirical benchmarks:
       </p>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs pt-1">
         <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
           <div class="font-bold text-sky-400 mb-1">⏱️ 1.5s - 2.0s Delay</div>
-          <div class="text-slate-400">Telegram soft-throttles user clients exceeding ~25-30 requests/min. A 1.5s delay guarantees safe execution under ~40 calls/min without triggering FloodWait.</div>
+          <div class="text-slate-400">Telegram soft-throttles user clients exceeding ~25-30 requests/min. A 1.5s delay keeps throughput safely under ~40 calls/min without triggering FloodWait.</div>
         </div>
         <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
           <div class="font-bold text-emerald-400 mb-1">📦 Max 50 Messages/Query</div>
@@ -258,7 +313,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </div>
     </section>
 
-    <!-- Account Ban & Recovery Playbook -->
+    <!-- Ban Recovery Playbook -->
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
       <div class="flex items-center justify-between cursor-pointer" onclick="togglePlaybook()">
         <div class="flex items-center gap-2">
@@ -305,6 +360,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <div>Safe-Telegram-MCP • Hardened Edition</div>
     </footer>
 
+  </div>
+
+  <!-- API Keys Modal -->
+  <div id="credentialsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+      <button onclick="closeCredentialsModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">✕</button>
+      
+      <h3 class="text-lg font-bold text-white flex items-center gap-2">
+        <span>🔑</span> Telegram API Credentials
+      </h3>
+      <p class="text-xs text-slate-400">
+        Get your free API ID and Hash from <a href="https://my.telegram.org/apps" target="_blank" class="text-sky-400 underline">my.telegram.org/apps</a>:
+      </p>
+
+      <div class="space-y-3 pt-2">
+        <div>
+          <label class="text-xs font-semibold text-slate-300 block mb-1">TELEGRAM_API_ID</label>
+          <input id="apiIdInput" type="text" placeholder="e.g. 1234567" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-slate-300 block mb-1">TELEGRAM_API_HASH</label>
+          <input id="apiHashInput" type="text" placeholder="e.g. 0123456789abcdef0123456789abcdef" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeCredentialsModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">
+          Cancel
+        </button>
+        <button onclick="saveCredentials()" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-colors">
+          Save Credentials
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- QR Login Modal -->
@@ -354,6 +443,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       }
     }
 
+    function openCredentialsModal() {
+      document.getElementById('credentialsModal').classList.remove('hidden');
+    }
+
+    function closeCredentialsModal() {
+      document.getElementById('credentialsModal').classList.add('hidden');
+    }
+
+    async function saveCredentials() {
+      const apiId = document.getElementById('apiIdInput').value.trim();
+      const apiHash = document.getElementById('apiHashInput').value.trim();
+
+      if (!apiId || !apiHash) {
+        alert('Please provide both API ID and API Hash.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ api_id: apiId, api_hash: apiHash })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          closeCredentialsModal();
+          loadStatus();
+          alert('Credentials saved successfully to .env!');
+        }
+      } catch (err) {
+        alert('Error saving credentials: ' + err);
+      }
+    }
+
     async function loadConfig() {
       try {
         const res = await fetch('/api/config');
@@ -379,13 +502,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         const dot = document.getElementById('statusDot');
         const text = document.getElementById('statusText');
 
+        if (data.api_id) document.getElementById('apiIdInput').value = data.api_id;
+        if (data.api_hash) document.getElementById('apiHashInput').value = data.api_hash;
+
         if (data.configured) {
           dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50";
-          text.textContent = "Telegram Configured";
+          text.textContent = "Telegram Connected";
           text.className = "text-emerald-300";
+        } else if (data.has_api_credentials) {
+          dot.className = "w-2.5 h-2.5 rounded-full bg-sky-400";
+          text.textContent = "API Keys Set (Scan QR)";
+          text.className = "text-sky-300";
         } else {
           dot.className = "w-2.5 h-2.5 rounded-full bg-amber-400";
-          text.textContent = "Credentials Missing (.env)";
+          text.textContent = "Set API Keys";
           text.className = "text-amber-300";
         }
       } catch {
@@ -531,6 +661,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         if (data.status === 'error') {
           spinner.textContent = "Error: " + data.message;
+          if (data.message.includes("must be set")) {
+            setTimeout(() => {
+              closeQrModal();
+              openCredentialsModal();
+            }, 1500);
+          }
           return;
         }
 
@@ -660,15 +796,35 @@ async def api_whitelist_import(request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok", "allowed_chats": cfg.allowed_chats})
 
 
+async def api_post_credentials(request: Request) -> JSONResponse:
+    data = await request.json()
+    api_id = str(data.get("api_id", "")).strip()
+    api_hash = str(data.get("api_hash", "")).strip()
+
+    if not api_id or not api_hash:
+        return JSONResponse({"status": "error", "message": "Both api_id and api_hash are required"}, status_code=400)
+
+    _safe_write_env_key("TELEGRAM_API_ID", api_id)
+    _safe_write_env_key("TELEGRAM_API_HASH", api_hash)
+
+    return JSONResponse({"status": "ok"})
+
+
 async def api_get_status(request: Request) -> JSONResponse:
-    has_api_id = bool(os.getenv("TELEGRAM_API_ID"))
+    load_dotenv(override=True)
+    api_id = os.getenv("TELEGRAM_API_ID")
+    api_hash = os.getenv("TELEGRAM_API_HASH")
+    has_api_credentials = bool(api_id and api_hash)
     has_session = bool(
         os.getenv("TELEGRAM_SESSION_STRING") or os.getenv("TELEGRAM_SESSION_NAME")
     )
     env_exists = Path(".env").is_file()
 
     return JSONResponse({
-        "configured": (has_api_id and has_session) or env_exists,
+        "configured": has_api_credentials and has_session,
+        "has_api_credentials": has_api_credentials,
+        "api_id": api_id or "",
+        "api_hash": (api_hash[:4] + "..." + api_hash[-4:]) if api_hash and len(api_hash) > 8 else "",
         "has_env_file": env_exists,
         "safe_config_file": Path(DEFAULT_CONFIG_FILE).is_file(),
     })
@@ -679,9 +835,8 @@ async def _async_qr_wait(client, qr):
 
     try:
         await qr.wait(timeout=60.0)
-        # Login succeeded!
         session_str = client.session.save()
-        write_env_value("TELEGRAM_SESSION_STRING", session_str)
+        _safe_write_env_key("TELEGRAM_SESSION_STRING", session_str)
         _QR_STATE["status"] = "authenticated"
     except asyncio.TimeoutError:
         _QR_STATE["status"] = "expired"
@@ -696,6 +851,7 @@ async def _async_qr_wait(client, qr):
 
 
 async def api_auth_qr_start(request: Request) -> JSONResponse:
+    load_dotenv(override=True)
     from telethon import TelegramClient
     from telethon.sessions import StringSession
 
@@ -705,7 +861,7 @@ async def api_auth_qr_start(request: Request) -> JSONResponse:
     if not api_id or not api_hash:
         return JSONResponse({
             "status": "error",
-            "message": "TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in .env first."
+            "message": "TELEGRAM_API_ID and TELEGRAM_API_HASH must be set first. Click 'API Keys' button in top bar."
         })
 
     try:
@@ -751,6 +907,7 @@ routes = [
     Route("/api/whitelist/remove", api_whitelist_remove, methods=["POST"]),
     Route("/api/whitelist/export", api_whitelist_export, methods=["GET"]),
     Route("/api/whitelist/import", api_whitelist_import, methods=["POST"]),
+    Route("/api/credentials", api_post_credentials, methods=["POST"]),
     Route("/api/status", api_get_status, methods=["GET"]),
     Route("/api/auth/qr/start", api_auth_qr_start, methods=["POST"]),
     Route("/api/auth/qr/status", api_auth_qr_status, methods=["GET"]),
@@ -759,11 +916,31 @@ routes = [
 app = Starlette(debug=False, routes=routes)
 
 
-def run_web_panel(host: str = "127.0.0.1", port: int = 8080) -> None:
-    print(f"\n🛡️ Safe-Telegram-MCP Web Dashboard starting at http://{host}:{port}\n")
+def run_web_panel(host: str = "127.0.0.1", port: Optional[int] = None) -> None:
+    if port is None:
+        env_port = os.getenv("TELEGRAM_PANEL_PORT")
+        if env_port:
+            try:
+                port = int(env_port)
+            except ValueError:
+                port = None
+
+    if port is None:
+        port = find_available_port(8080)
+
+    url = f"http://{host}:{port}"
+    print(f"\n=======================================================")
+    print(f"  🛡️ Safe-Telegram-MCP Web Dashboard")
+    print(f"  🔗 URL: {url}")
+    print(f"=======================================================\n")
+
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+
     uvicorn.run(app, host=host, port=port, log_level="warning")
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("TELEGRAM_PANEL_PORT", "8080"))
-    run_web_panel(port=port)
+    run_web_panel()

@@ -54,24 +54,20 @@ uv run python main.py --ui
 
 ---
 
-## 🚀 راهنمای سریع نصب و راه‌اندازی
+## 🚀 نصب و اجرای تک‌مرحله‌ای (۱ دستور)
+
+بدون نیاز به چند مرحله دستی، کلون و اسکریپت خودکار زیر را اجرا کنید:
 
 ```bash
-# ۱. کلون ریپازیتوری
-git clone https://github.com/ketabchi-ar/Safe-Telegram-MCP.git
-cd Safe-Telegram-MCP
-
-# ۲. نصب پیش‌نیازها با uv
-uv sync
-
-# ۳. دریافت API ID و API HASH از my.telegram.org/apps
-# و ساخت فایل .env بر اساس .env.example
-
-# ۴. اجرای داشبورد مدیریت و تنظیم لیست سفید
-uv run python main.py --ui
+git clone https://github.com/ketabchi-ar/Safe-Telegram-MCP.git && cd Safe-Telegram-MCP && ./install.sh
 ```
 
-> 💡 **نکته برای مک و لینوکس:** اگر خطای `zsh: command not found: python` دریافت کردید، حتماً دستورات را با پیشوند `uv run` اجرا کنید (مانند `uv run python main.py --ui`) یا ابتدا محیط مجازی را با `source .venv/bin/activate` فعال کنید.
+این اسکریپت تمام پیش‌نیازها را بررسی، محیط را آماده و خودکار داشبورد را روی یک پورت آزاد باز می‌کند.
+
+### یا اجرای دستی:
+```bash
+uv run python main.py --ui
+```
 
 ---
 
