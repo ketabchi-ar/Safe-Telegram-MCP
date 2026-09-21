@@ -33,6 +33,7 @@ class SafeSecurityConfig:
     allowed_chats: List[str] = field(default_factory=lambda: ["me"])
     prevent_peer_flood: bool = True
     strict_whitelist: bool = False
+    accounts: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: Union[str, Path] = DEFAULT_CONFIG_FILE) -> "SafeSecurityConfig":
@@ -66,6 +67,7 @@ class SafeSecurityConfig:
                 allowed_chats=list(data.get("allowed_chats", ["me"])),
                 prevent_peer_flood=bool(data.get("prevent_peer_flood", True)),
                 strict_whitelist=bool(data.get("strict_whitelist", False)),
+                accounts=dict(data.get("accounts", {})),
             )
         except Exception as exc:
             logger.warning("Failed to parse security config %s (%s). Using defaults.", file_path, exc)
@@ -87,10 +89,26 @@ _LAST_REQUEST_TIME: float = 0.0
 _RATE_LOCK = asyncio.Lock()
 
 
-def get_security_config() -> SafeSecurityConfig:
+def get_security_config(account: Optional[str] = None) -> SafeSecurityConfig:
     global _ACTIVE_CONFIG
     if _ACTIVE_CONFIG is None:
         _ACTIVE_CONFIG = SafeSecurityConfig.load()
+    if not account or str(account).lower() in ("global", "all", "none"):
+        return _ACTIVE_CONFIG
+
+    acc_key = str(account).lower().strip()
+    if acc_key in _ACTIVE_CONFIG.accounts:
+        acc_data = _ACTIVE_CONFIG.accounts[acc_key]
+        return SafeSecurityConfig(
+            safe_mode=bool(acc_data.get("safe_mode", _ACTIVE_CONFIG.safe_mode)),
+            read_only=bool(acc_data.get("read_only", _ACTIVE_CONFIG.read_only)),
+            rate_limit_delay=float(acc_data.get("rate_limit_delay", _ACTIVE_CONFIG.rate_limit_delay)),
+            max_messages_limit=int(acc_data.get("max_messages_limit", _ACTIVE_CONFIG.max_messages_limit)),
+            allowed_chats=list(acc_data.get("allowed_chats", _ACTIVE_CONFIG.allowed_chats)),
+            prevent_peer_flood=bool(acc_data.get("prevent_peer_flood", _ACTIVE_CONFIG.prevent_peer_flood)),
+            strict_whitelist=bool(acc_data.get("strict_whitelist", _ACTIVE_CONFIG.strict_whitelist)),
+            accounts=_ACTIVE_CONFIG.accounts,
+        )
     return _ACTIVE_CONFIG
 
 
@@ -184,7 +202,8 @@ class SafeSecurityMiddleware:
             tool_name = params.get("name", "")
             arguments = params.get("arguments", {}) or {}
 
-            config = get_security_config()
+            account = arguments.get("account")
+            config = get_security_config(account=account)
 
             # 1. Read-Only Mode Check
             if config.safe_mode and config.read_only:
@@ -195,7 +214,7 @@ class SafeSecurityMiddleware:
                                 type="text",
                                 text=(
                                     f"[SECURITY GUARD BLOCKED] Action '{tool_name}' rejected: "
-                                    "Server is operating in READ_ONLY mode. Modify settings in safe_config.json "
+                                    f"Account '{account or 'default'}' is operating in READ_ONLY mode. Modify settings in safe_config.json "
                                     "or via the Safe-Telegram-MCP Web Dashboard to permit write actions."
                                 ),
                             )
@@ -211,7 +230,7 @@ class SafeSecurityMiddleware:
                 or arguments.get("target_chat")
                 or arguments.get("channel")
             )
-            if chat_target is not None and not is_chat_allowed(chat_target):
+            if chat_target is not None and not is_chat_allowed(chat_target, account=account):
                 return CallToolResult(
                     content=[
                         TextContent(

@@ -50,6 +50,13 @@ Standard Telegram MCP integrations connect AI models (Claude, Cursor, Codex) dir
 - Add and remove whitelisted chats in real time without editing JSON or `.env` files.
 - Visual status indicator showing Telegram credentials and interactive in-browser QR login.
 
+### 5. 👥 Intelligent Multi-Account & Live Identity Verification
+- **Simultaneous Multi-Account Support:** Connect and manage multiple Telegram accounts on a single server with custom labels (`default`, `work`, `personal`).
+- **Live MTProto Identity Inspection:** Displays user full name, `@username`, numerical User ID, and masked phone number verified directly from Telegram servers.
+- **Revoked Session Detection:** Instantly flags sessions terminated from Telegram mobile devices (*Settings > Devices > Terminate*), avoiding misleading status or unexpected runtime errors.
+- **Granular Per-Account Whitelist & Policies:** Tailor chat whitelists, read-only modes, and request pacing independently for each configured account.
+- **1-Click MCP Command Generator:** Automatically presents copyable configuration snippets for Hermes Agent, Claude Desktop, Cursor, Windsurf, and Codex upon successful authentication.
+
 ---
 
 ## ⚡ Quick Start in 3 Easy Steps
