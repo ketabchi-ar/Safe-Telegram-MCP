@@ -928,19 +928,23 @@ async def api_post_credentials(request: Request) -> JSONResponse:
 
 async def api_get_status(request: Request) -> JSONResponse:
     load_dotenv(override=True)
-    api_id = os.getenv("TELEGRAM_API_ID")
-    api_hash = os.getenv("TELEGRAM_API_HASH")
-    has_api_credentials = bool(api_id and api_hash)
-    has_session = bool(
-        os.getenv("TELEGRAM_SESSION_STRING") or os.getenv("TELEGRAM_SESSION_NAME")
-    )
+    api_id = os.getenv("TELEGRAM_API_ID", "").strip()
+    api_hash = os.getenv("TELEGRAM_API_HASH", "").strip()
+
+    is_dummy_api = (api_id == "123456" or api_hash == "0123456789abcdef0123456789abcdef")
+    has_api_credentials = bool(api_id and api_hash and not is_dummy_api)
+
+    session_str = os.getenv("TELEGRAM_SESSION_STRING", "").strip()
+    is_dummy_session = session_str.startswith("123123")
+    has_session = bool(session_str and len(session_str) > 30 and not is_dummy_session)
+
     env_exists = Path(".env").is_file()
 
     return JSONResponse({
         "configured": has_api_credentials and has_session,
         "has_api_credentials": has_api_credentials,
-        "api_id": api_id or "",
-        "api_hash": (api_hash[:4] + "..." + api_hash[-4:]) if api_hash and len(api_hash) > 8 else "",
+        "api_id": "" if is_dummy_api else api_id,
+        "api_hash": "" if is_dummy_api else ((api_hash[:4] + "..." + api_hash[-4:]) if len(api_hash) > 8 else ""),
         "has_env_file": env_exists,
         "safe_config_file": Path(DEFAULT_CONFIG_FILE).is_file(),
     })
