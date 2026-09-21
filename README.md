@@ -67,9 +67,9 @@ Once you authenticate via the Web Dashboard QR login, your session token is auto
 ### 1. Hermes Agent
 Run this single command in your terminal:
 ```bash
-hermes mcp add telegram --command uv --args --directory /path/to/Safe-Telegram-MCP run main.py
+printf "Y\n" | hermes mcp add telegram --command uv --args --directory ~/Safe-Telegram-MCP run main.py
 ```
-*(Hermes will immediately discover and index the available tools).*
+*(Hermes will immediately connect, confirm all tools, and register the server).*
 
 ### 2. Claude Desktop
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
