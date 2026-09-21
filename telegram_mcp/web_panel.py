@@ -767,6 +767,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
       try {
         const res = await fetch('/api/auth/qr/start', { method: 'POST' });
+        if (!res.ok) {
+          const raw = await res.text();
+          spinner.textContent = "Server Error (" + res.status + "): " + raw.slice(0, 120);
+          return;
+        }
         const data = await res.json();
 
         if (data.status === 'error') {
@@ -978,29 +983,54 @@ async def api_auth_qr_start(request: Request) -> JSONResponse:
     try:
         api_id_int = int(api_id)
     except ValueError:
-        return JSONResponse({"status": "error", "message": "Invalid TELEGRAM_API_ID."})
+        return JSONResponse({"status": "error", "message": "Invalid TELEGRAM_API_ID. It must be an integer."})
 
     kwargs = client_identity_kwargs()
-    client = TelegramClient(StringSession(), api_id_int, api_hash, **kwargs)
-    await client.connect()
 
-    qr = await client.qr_login()
-    data_uri = _generate_qr_data_uri(qr.url)
-    expires_str = qr.expires.astimezone().strftime("%H:%M:%S")
+    try:
+        from telegram_mcp.proxy import _build_proxy_for_label
+        proxy, connection = _build_proxy_for_label("")
+        if proxy is not None:
+            kwargs["proxy"] = proxy
+        if connection is not None:
+            kwargs["connection"] = connection
+    except Exception:
+        pass
 
-    _QR_STATE["client"] = client
-    _QR_STATE["qr"] = qr
-    _QR_STATE["status"] = "waiting_scan"
-    _QR_STATE["qr_data_uri"] = data_uri
-    _QR_STATE["expires_at"] = expires_str
-    _QR_STATE["task"] = asyncio.create_task(_async_qr_wait(client, qr))
+    try:
+        client = TelegramClient(StringSession(), api_id_int, api_hash, **kwargs)
+        await asyncio.wait_for(client.connect(), timeout=15.0)
 
-    return JSONResponse({
-        "status": "waiting_scan",
-        "qr_data_uri": data_uri,
-        "qr_url": qr.url,
-        "expires_at": expires_str,
-    })
+        qr = await client.qr_login()
+        data_uri = _generate_qr_data_uri(qr.url)
+        expires_str = qr.expires.astimezone().strftime("%H:%M:%S")
+
+        _QR_STATE["client"] = client
+        _QR_STATE["qr"] = qr
+        _QR_STATE["status"] = "waiting_scan"
+        _QR_STATE["qr_data_uri"] = data_uri
+        _QR_STATE["expires_at"] = expires_str
+        _QR_STATE["task"] = asyncio.create_task(_async_qr_wait(client, qr))
+
+        return JSONResponse({
+            "status": "waiting_scan",
+            "qr_data_uri": data_uri,
+            "qr_url": qr.url,
+            "expires_at": expires_str,
+        })
+    except asyncio.TimeoutError:
+        return JSONResponse({
+            "status": "error",
+            "message": "Connection to Telegram timed out. Check your internet or local proxy (TELEGRAM_PROXY_* in .env)."
+        })
+    except Exception as exc:
+        err_msg = str(exc)
+        if "ApiIdInvalidError" in type(exc).__name__ or "api_id" in err_msg.lower():
+            err_msg = "Invalid API ID or API Hash. Please verify keys from my.telegram.org/apps."
+        return JSONResponse({
+            "status": "error",
+            "message": f"{type(exc).__name__}: {err_msg}"
+        })
 
 
 async def api_auth_qr_status(request: Request) -> JSONResponse:
