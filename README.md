@@ -50,13 +50,50 @@ Standard Telegram MCP integrations connect AI models (Claude, Cursor, Codex) dir
 - Add and remove whitelisted chats in real time without editing JSON or `.env` files.
 - Visual status indicator showing Telegram credentials and interactive in-browser QR login.
 
-```bash
-# 🚀 1-Step Fresh Install & Launch:
-git clone https://github.com/ketabchi-ar/Safe-Telegram-MCP.git && cd Safe-Telegram-MCP && ./install.sh
+---
 
-# 🔄 1-Step Update & Launch:
-cd ~/Safe-Telegram-MCP && git pull origin main && ./install.sh
+## ⚡ Quick Start in 3 Easy Steps
+
+### Step 1: Install & Auto-Launch Dashboard (1 terminal command)
+```bash
+git clone https://github.com/ketabchi-ar/Safe-Telegram-MCP.git && cd Safe-Telegram-MCP && ./install.sh
 ```
+
+### Step 2: Configure & Scan QR in Browser
+1. In the opened Web Dashboard, click **🔑 API Keys** and press **"Use Official Desktop Keys"**.
+2. Click **📲 QR Login** and scan the QR code with your mobile Telegram app (*Settings > Devices > Link Desktop Device*).
+3. Add allowed chat targets to your Whitelist (e.g. `me` for your Saved Messages, or specific work channels).
+
+### Step 3: Connect to Hermes Agent (or other AI clients)
+Simply run this command in your terminal:
+```bash
+printf "Y\n" | hermes mcp add telegram --command uv --args --directory ~/Safe-Telegram-MCP run main.py
+```
+*(For Claude Desktop, Cursor, or VS Code, see the [Client Setup Guide](#-connecting-to-ai-agents-hermes-agent-claude-desktop-cursor)).*
+
+---
+
+## 🛠️ The 227-Tool Telegram Arsenal: What Can Your AI Agent Do?
+
+Safe-Telegram-MCP provides **227 specialized MTProto tools** to your AI agent, all strictly bounded by your configured whitelist:
+
+- **💬 Messages & Conversations:** Send, edit, delete, un-attributed copy (`copy_message`), reply, schedule (`schedule_message`), and manage drafts (`save_draft`).
+- **📌 Saved Messages (`me`):** Read, write, tag, and query your personal cloud bookmarks and notes.
+- **📢 Channels & Groups:** Monitor channel broadcasts, manage forum topics, create custom invite links, and control admin permissions.
+- **📁 Media, Files & Voice:** Upload/download files, send voice messages (OGG/OPUS), video notes, albums, stickers, and animated GIFs.
+- **🔒 Secret Chats (MTProto 2.0):** Full end-to-end encrypted messaging, self-destructing timed media, and ephemeral chat controls.
+- **👥 Contacts & Profile:** Search address books, inspect online statuses, manage custom aliases, and handle active sessions.
+- **🤖 Interactive & Bots:** Create/vote in polls, click inline bot buttons (`click_button`), launch Mini Apps, and translate text.
+
+### 💡 Real-World Practical Scenarios:
+1. **Personal AI Task Assistant:**  
+   *"Hermes, read my recent notes in Telegram Saved Messages, extract all action items for today, and prioritize them."*
+2. **Automated Output Archiving:**  
+   *"Format the executive summary of this project and send it directly to my Telegram Saved Messages."*
+3. **Channel Intelligence & Monitoring:**  
+   *"Check @team_updates and tell me if any urgent announcements or deadlines were posted today."*
+4. **Scheduled Communications:**  
+   *"Schedule this status update to be sent to our work channel tomorrow morning at 9:00 AM."*
 
 ---
 
