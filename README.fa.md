@@ -75,13 +75,9 @@ uv run python main.py --ui
 پس از اینکه ورود از طریق داشبورد انجام شد، سشن در فایل `.env` ذخیره می‌شود. اکنون می‌توانید سرور را به مدل‌های هوش مصنوعی خود متصل کنید:
 
 ### ۱. اتصال به Hermes Agent
-کافیست در ترمینال دستور زیر را اجرا کنید (آدرس پوشه را تنظیم کنید):
+کافیست در ترمینال دستور زیر را اجرا کنید:
 ```bash
-hermes mcp add telegram --command uv --args --directory /مسیر/کامل/پروژه/Safe-Telegram-MCP run main.py
-```
-یا در مک شما:
-```bash
-hermes mcp add telegram --command uv --args --directory /Users/ardalanketabchi/Safe-Telegram-MCP run main.py
+hermes mcp add telegram --command uv --args --directory ~/Safe-Telegram-MCP run main.py
 ```
 
 ### ۲. اتصال به Claude Desktop
@@ -97,7 +93,7 @@ hermes mcp add telegram --command uv --args --directory /Users/ardalanketabchi/S
       "command": "uv",
       "args": [
         "--directory",
-        "/Users/ardalanketabchi/Safe-Telegram-MCP",
+        "/path/to/Safe-Telegram-MCP",
         "run",
         "main.py"
       ]
