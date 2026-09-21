@@ -382,6 +382,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         شناسه و هش برنامه خود را رایگان از <a href="https://my.telegram.org/apps" target="_blank" class="text-sky-400 underline">my.telegram.org/apps</a> دریافت کنید:
       </p>
 
+      <div class="p-3 bg-sky-500/10 border border-sky-500/20 rounded-xl space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-sky-300" id="quickSetupTitle">⚡ راهکار فوری بدون دردسر:</span>
+          <button type="button" onclick="useOfficialDesktopKeys()" class="text-xs px-2.5 py-1 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-lg transition-colors" id="btnFillDesktopKeys">
+            استفاده از کلیدهای رسمی دسکتاپ
+          </button>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-relaxed" id="quickSetupDesc">
+          اگر در سایت my.telegram.org خطای ERROR دریافت می‌کنید، با زدن این دکمه از کلیدهای متن‌باز تلگرام دسکتاپ (2040) استفاده کنید و مستقیم وارد شوید.
+        </p>
+      </div>
+
       <div class="space-y-3 pt-2">
         <div>
           <label class="text-xs font-semibold text-slate-300 block mb-1">TELEGRAM_API_ID</label>
@@ -471,6 +483,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         chatSingular: "چت",
         chatPlural: "چت",
         noChats: "هنوز چتی به لیست مجاز اضافه نشده است.",
+        quickSetupTitle: "⚡ راهکار فوری بدون دردسر:",
+        btnFillDesktopKeys: "استفاده از کلیدهای رسمی دسکتاپ",
+        quickSetupDesc: "اگر در سایت my.telegram.org خطای ERROR دریافت می‌کنید، با زدن این دکمه از کلیدهای متن‌باز تلگرام دسکتاپ (2040) استفاده کنید و مستقیم وارد شوید.",
       },
       en: {
         badgeHardened: "Hardened",
@@ -502,6 +517,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         chatSingular: "chat",
         chatPlural: "chats",
         noChats: "No chats whitelisted yet.",
+        quickSetupTitle: "⚡ Quick 1-Click Solution:",
+        btnFillDesktopKeys: "Use Official Desktop Keys",
+        quickSetupDesc: "If my.telegram.org returns 'ERROR', click this button to automatically use official open-source Telegram Desktop credentials (2040) without registration.",
       }
     };
 
@@ -553,6 +571,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     function closeCredentialsModal() {
       document.getElementById('credentialsModal').classList.add('hidden');
+    }
+
+    function useOfficialDesktopKeys() {
+      document.getElementById('apiIdInput').value = "2040";
+      document.getElementById('apiHashInput').value = "b18441a1ff607e10a989891a5462e627";
+      saveCredentials();
     }
 
     async function saveCredentials() {
@@ -990,6 +1014,10 @@ async def api_auth_qr_start(request: Request) -> JSONResponse:
         return JSONResponse({"status": "error", "message": "Invalid TELEGRAM_API_ID. It must be an integer."})
 
     kwargs = client_identity_kwargs()
+    if api_id_int == 2040:
+        kwargs.setdefault("device_model", "Telegram Desktop")
+        kwargs.setdefault("system_version", "macOS 15.3")
+        kwargs.setdefault("app_version", "5.10.3")
 
     try:
         from telegram_mcp.proxy import _build_proxy_for_label
