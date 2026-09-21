@@ -60,6 +60,55 @@ cd ~/Safe-Telegram-MCP && git pull origin main && ./install.sh
 
 ---
 
+## 🤖 Connecting to AI Agents (Hermes Agent, Claude Desktop, Cursor)
+
+Once you authenticate via the Web Dashboard QR login, your session token is automatically saved into `.env`. You can now connect Safe-Telegram-MCP to your AI assistant:
+
+### 1. Hermes Agent
+Run this single command in your terminal:
+```bash
+hermes mcp add telegram --command uv --args --directory /path/to/Safe-Telegram-MCP run main.py
+```
+*(Hermes will immediately discover and index the available tools).*
+
+### 2. Claude Desktop
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+```json
+{
+  "mcpServers": {
+    "safe-telegram": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/full/path/to/Safe-Telegram-MCP",
+        "run",
+        "main.py"
+      ]
+    }
+  }
+}
+```
+
+### 3. Cursor / Windsurf / VS Code
+Add as an MCP server with `command: "uv"` and arguments `["--directory", "/full/path/to/Safe-Telegram-MCP", "run", "main.py"]`.
+
+---
+
+## 💡 Is Telegram Desktop required to be installed?
+**No! You do NOT need the Telegram Desktop app installed on your machine.**  
+The official Telegram Desktop application ID (`api_id=2040`) is purely an MTProto protocol signature recognized by Telegram servers. It runs completely standalone on **macOS, Linux, Windows, Docker, and headless cloud servers**.
+
+---
+
+## 🎯 What can your AI Agent do after connecting?
+
+Your AI agent gains access to 200+ Telegram capabilities, **strictly bounded by your whitelist**:
+- **Saved Messages (`me`):** Ask the agent to read your latest notes, summarize saved articles, or append new tasks directly to your *Saved Messages*.
+- **Whitelisted Channel/Group Analysis:** Summarize discussions, extract links, or monitor announcements from authorized channels (e.g. `@my_work_team`).
+- **Bulletproof Privacy Guard:** Any agent request targeting a non-whitelisted contact, family member, or financial chat is instantly rejected by the middleware with `[SECURITY GUARD BLOCKED]`.
+
+---
+
 ## 🔐 Golden Rules: Secure Login, IP Alignment & Device Spoofing
 
 To prevent Telegram's security algorithms from flagging your AI session as a suspicious or fraudulent device:
