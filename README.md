@@ -1,31 +1,104 @@
+<p align="center">
+  <img src="assets/banner.svg" alt="Safe-Telegram-MCP Banner" width="100%" />
+</p>
+
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=200&section=header&text=Safe%20Telegram%20MCP&fontSize=50&fontAlignY=35&animation=fadeIn&fontColor=FFFFFF&descAlignY=55&descAlign=62" alt="Safe Telegram MCP Server" width="100%" />
-</div>
 
 [![DevSponsors](https://img.shields.io/badge/DevSponsors-Verified_OSS-6366f1?style=for-the-badge&logo=github)](https://devsponsors.github.io)
 [![Sponsor](https://img.shields.io/badge/Sponsor-DevSponsors_Hub-emerald?style=for-the-badge&logo=github-sponsors)](https://devsponsors.github.io)
 ![MCP Badge](https://badge.mcpx.dev)
 [![Licence: GPL-3.0-or-later](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue?style=flat-square)](LICENSE)
 
+</div>
+
 > 🛡️ **Safe-Telegram-MCP**: Hardened Telegram Model Context Protocol (MCP) server equipped with Chat Whitelisting, Anti-Flood ban protection, Read-Only safety switch, and an interactive Local Web Management Dashboard.
+
+---
+
+## 🌟 Why Safe-Telegram-MCP?
+
+Standard Telegram MCP integrations connect AI models (Claude, Cursor, Codex) directly to user accounts via MTProto with **unrestricted, full-account access**. This introduces critical vulnerabilities:
+
+1. **Catastrophic Data Leakage:** An AI agent exploring your account can inspect private family conversations, confidential work discussions, and sensitive OTP tokens stored in *Saved Messages*.
+2. **Indirect Prompt Injection:** A rogue message in a public group can hijack the agent to exfiltrate private chats or send unsolicited messages on your behalf.
+3. **Telegram Account Bans (`FloodWaitError` / `PHONE_NUMBER_BANNED`):** Rapid message scanning or mass actions quickly trigger Telegram's automated spam detection algorithms.
+
+**Safe-Telegram-MCP** solves these issues with a zero-trust, hardened gateway architecture between MCP clients and Telegram.
 
 ---
 
 ## 🛡️ Hardened Security Features
 
-- **📋 Chat Whitelisting (Privacy & Anti-Prompt-Injection):**
-  Prevent AI models from browsing private family chats, financial records, or credentials. Only specifically approved chat IDs/usernames (e.g. `me`, `@my_channel`, `12345678`) can be accessed.
-- **⚡ Anti-Flood & Ban Prevention:**
-  Enforces configurable request pacing and bounded batch queries to eliminate Telegram `FloodWaitError` risks and keep your account safe from spam flags.
-- **🔒 Read-Only Guard:**
-  One toggle blocks all write, edit, delete, or moderation actions. The AI agent can read and analyze whitelisted chats without modifying anything.
-- **🖥️ Local Web Dashboard (`--ui`):**
-  A modern, zero-dependency browser management interface (`http://localhost:8080`) to add/remove whitelisted chats, configure rate limits, and inspect connection status with a single click.
+### 1. 📋 Chat Whitelisting (Privacy Firewall)
+- **Zero-Access by Default:** Models can only query, read, or send to explicitly approved chat targets (e.g. `me`, `@work_channel`, `12345678`).
+- **Immediate Rejection:** Any tool invocation targeting an unapproved chat is halted at the MCP middleware layer before ever making a network call.
+- **Saved-Messages Isolation:** Use `me` to allow the AI to interact exclusively with your own notes and bookmarked messages.
+
+### 2. ⚡ Anti-Flood & Ban Prevention (MTProto Safe-Pacing)
+- **Intelligent Delay:** Implements a default `1.5s - 2.0s` sleep interval between consecutive MTProto calls, ensuring request frequency stays safely below Telegram's automated throttling thresholds (~20-30 req/min).
+- **Query Chunk Clamping:** Automatically bounds large history requests to a maximum of 50 messages per batch to avoid server-side heavy-query flags.
+- **Anti-Peer-Flood Guard:** Disallows initiating unsolicited chats with unknown non-contact users.
+
+### 3. 🔒 Read-Only Guard
+- Toggle a single switch to convert the entire server into a strictly non-destructive information-retrieval engine. All message posting, editing, deletion, and administrative actions are blocked instantly.
+
+### 4. 🖥️ Local Web Dashboard (`--ui`)
+- Manage your configuration effortlessly via a clean, dark-mode browser interface at `http://localhost:8080`.
+- Add and remove whitelisted chats in real time without editing JSON or `.env` files.
+- Visual status indicator showing Telegram credentials and session validity.
 
 ```bash
-# Launch the Web Security Dashboard:
+# Launch the Web Management Dashboard:
 python main.py --ui
+# or using the CLI command:
+safe-telegram-panel
 ```
+
+---
+
+## 📊 Optimal Rate Limits Reference (MTProto & Telethon Benchmarks)
+
+| Metric | Safe Value | Rationale |
+| :--- | :--- | :--- |
+| **Request Pacing (Delay)** | **1.5s - 2.0s** | Telegram soft-throttles user clients exceeding ~25-30 calls/minute. A 1.5s delay keeps throughput at ~40 calls/min maximum, preventing `FloodWaitError`. |
+| **Message Batch Limit** | **Max 50 items** | Querying > 50-100 messages at once stresses Telegram's database layer and frequently triggers `FloodWait: X seconds required`. |
+| **Outbound Messages** | **< 20 msgs / min** | Sending messages to distinct chats rapidly triggers SpamBlocker heuristic rules. |
+| **Non-Contact Messaging** | **Disabled (0)** | Initiating conversations with > 5-10 strangers per day triggers immediate account muting via Telegram's automated spam bots. |
+
+---
+
+## 🚨 Account Restriction & Ban Recovery Playbook
+
+If your account ever encounters restrictions during MTProto development, follow this emergency recovery procedure:
+
+### Case 1: Temporary `FloodWaitError` (`A wait of X seconds is required`)
+- **Cause:** Too many requests sent within a short duration.
+- **Action:** **DO NOT RETRY!** Retrying before the cooldown completes will double or compound the wait timer. Allow the specified time to lapse completely. Safe-Telegram-MCP handles this automatically.
+
+### Case 2: Restricted / Muted (`PeerFloodError` - Cannot message non-contacts)
+- **Cause:** Account flagged by Telegram's automated SpamBlocker.
+- **Action:**
+  1. Open Telegram and search for the official [@SpamBot](https://t.me/SpamBot).
+  2. Press `/start`.
+  3. Select *"This is a mistake"* → *"Yes, I confirm"* → *"I never sent spam"*.
+  4. First-time restrictions are typically lifted automatically within 24 to 48 hours.
+
+### Case 3: Full Account Ban (`PHONE_NUMBER_BANNED`)
+- **Cause:** Severe anti-spam trigger caused by aggressive scripts or untrusted IP ranges.
+- **Action:**
+  1. Send an email to `recover@telegram.org` and `login@telegram.org`.
+  2. **Subject:** `Banned phone number: +[CountryCode][Number]`
+  3. **Body:**
+     ```text
+     Hello Telegram Support Team,
+     My phone number (+[CountryCode][Number]) was banned unexpectedly.
+     I was testing a local development client on my personal computer using official MTProto libraries.
+     I have never sent spam, bulk messages, or violated Telegram Terms of Service.
+     Please kindly review the automated flag and restore access to my account.
+     Thank you.
+     ```
+  4. Submit an appeal through the official web form: [https://telegram.org/support](https://telegram.org/support).
+  5. Reach out on X/Twitter to [@smstelegram](https://twitter.com/smstelegram) and [@Telegram](https://twitter.com/telegram).
 
 ---
 [![Tests](https://github.com/KiaroSama/telegram-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/KiaroSama/telegram-mcp/actions/workflows/tests.yml)

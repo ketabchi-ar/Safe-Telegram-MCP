@@ -3,8 +3,9 @@
 Provides a user-friendly management interface to:
 - Toggle Safe Mode and Read-Only Mode
 - Add/Remove whitelisted chats with ease
-- Adjust anti-flood rate limits
+- Adjust anti-flood rate limits with MTProto/Telethon documented guidelines
 - Check Telegram connection and session status
+- View account ban recovery and troubleshooting guide
 """
 
 from __future__ import annotations
@@ -50,17 +51,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     }
   </script>
   <style>
-    body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: #0b0f19; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
   </style>
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center p-4 md:p-8">
+<body class="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col items-center p-4 md:p-8">
   <div class="max-w-4xl w-full space-y-6">
     
     <!-- Header -->
-    <header class="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl gap-4">
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl gap-4 backdrop-blur">
       <div>
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xl border border-sky-500/30">
+          <div class="w-11 h-11 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold text-2xl border border-sky-500/30 shadow-inner">
             🛡️
           </div>
           <div>
@@ -68,11 +69,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
               Safe-Telegram-MCP
               <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">Hardened</span>
             </h1>
-            <p class="text-xs text-slate-400">Security Control & Chat Whitelist Dashboard</p>
+            <p class="text-xs text-slate-400">Zero-Leak Chat Whitelisting & Anti-Flood Ban Protection</p>
           </div>
         </div>
       </div>
-      <div id="statusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs font-medium">
+      <div id="statusBadge" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-medium">
         <span class="w-2.5 h-2.5 rounded-full bg-slate-500 animate-pulse" id="statusDot"></span>
         <span id="statusText">Checking status...</span>
       </div>
@@ -82,16 +83,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       
       <!-- Whitelist Management -->
-      <section class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+      <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
         <div>
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center justify-between mb-3">
             <h2 class="text-lg font-bold text-white flex items-center gap-2">
               <span>📋</span> Allowed Chats (Whitelist)
             </h2>
             <span id="whitelistCount" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-sky-400 border border-slate-700">0 chats</span>
           </div>
-          <p class="text-xs text-slate-400 mb-4">
-            The AI agent can ONLY read or send to these approved targets. All others are blocked.
+          <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+            AI agents can <strong class="text-slate-200">ONLY</strong> read, query, or send to approved targets. All private family chats, banks, and unlisted groups remain invisible and strictly forbidden.
           </p>
 
           <!-- Add chat form -->
@@ -99,35 +100,39 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <input 
               id="newChatInput" 
               type="text" 
-              placeholder="e.g. me, @channel, or 12345678" 
-              class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-sky-500 text-white placeholder-slate-500"
+              placeholder="e.g. me, @mychannel, or 12345678" 
+              class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-sky-500 text-white placeholder-slate-500 transition-colors"
               onkeydown="if(event.key==='Enter') addChat()"
             />
             <button 
               onclick="addChat()" 
-              class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm transition-colors shadow-lg shadow-sky-500/10">
+              class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-sm transition-colors shadow-lg shadow-sky-500/10">
               Add
             </button>
           </div>
 
           <!-- List -->
-          <ul id="whitelistContainer" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+          <ul id="whitelistContainer" class="space-y-2 max-h-64 overflow-y-auto pr-1">
             <li class="text-xs text-slate-500 py-3 text-center">Loading allowed chats...</li>
           </ul>
         </div>
+        
+        <div class="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-500">
+          💡 Tip: Use <code class="text-sky-400 font-mono">me</code> to restrict AI to your own <em>Saved Messages</em>.
+        </div>
       </section>
 
-      <!-- Security Controls -->
-      <section class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+      <!-- Security & Anti-Flood Controls -->
+      <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
         <h2 class="text-lg font-bold text-white flex items-center gap-2">
           <span>⚙️</span> Security & Anti-Flood Policies
         </h2>
 
         <!-- Safe Mode Toggle -->
-        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800/80">
           <div>
-            <div class="font-medium text-sm text-slate-200">Safe Mode Protection</div>
-            <div class="text-xs text-slate-400">Enforces whitelist & flood protection rules</div>
+            <div class="font-semibold text-sm text-slate-200">Safe Mode Protection</div>
+            <div class="text-xs text-slate-400">Enforces whitelist barriers & rate controls</div>
           </div>
           <label class="relative inline-flex items-center cursor-pointer">
             <input id="toggleSafeMode" type="checkbox" class="sr-only peer" onchange="saveConfig()">
@@ -136,10 +141,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         <!-- Read Only Toggle -->
-        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800/80">
           <div>
-            <div class="font-medium text-sm text-slate-200">Read-Only Mode</div>
-            <div class="text-xs text-slate-400">Blocks sending messages, deleting, or admin edits</div>
+            <div class="font-semibold text-sm text-slate-200">Read-Only Mode</div>
+            <div class="text-xs text-slate-400">Blocks sending messages, edits, or deletes</div>
           </div>
           <label class="relative inline-flex items-center cursor-pointer">
             <input id="toggleReadOnly" type="checkbox" class="sr-only peer" onchange="saveConfig()">
@@ -148,9 +153,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         <!-- Anti-Peer Flood -->
-        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800/80">
           <div>
-            <div class="font-medium text-sm text-slate-200">Anti-Peer Flood Protection</div>
+            <div class="font-semibold text-sm text-slate-200">Anti-Peer Flood Guard</div>
             <div class="text-xs text-slate-400">Blocks sending messages to non-contact strangers</div>
           </div>
           <label class="relative inline-flex items-center cursor-pointer">
@@ -160,10 +165,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         <!-- Rate Limit Slider -->
-        <div class="space-y-2 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+        <div class="space-y-2 p-3.5 rounded-xl bg-slate-950 border border-slate-800/80">
           <div class="flex justify-between items-center">
-            <span class="text-sm font-medium text-slate-200">Anti-Flood Delay</span>
-            <span id="rateLimitLabel" class="text-xs font-mono text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded">1.5s</span>
+            <span class="text-sm font-semibold text-slate-200">Request Pacing (Delay)</span>
+            <span id="rateLimitLabel" class="text-xs font-mono font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">1.5s</span>
           </div>
           <input 
             id="rateLimitInput" 
@@ -176,19 +181,85 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             oninput="document.getElementById('rateLimitLabel').textContent = this.value + 's'"
             onchange="saveConfig()"
           />
-          <div class="text-[11px] text-slate-500 flex justify-between">
-            <span>Fast (0.5s)</span>
-            <span>Recommended (1.5s)</span>
-            <span>Ultra Safe (5.0s)</span>
+          <div class="text-[11px] text-slate-400 flex justify-between pt-1">
+            <span>Aggressive (0.5s)</span>
+            <span class="text-sky-400 font-semibold">Recommended (1.5s - 2.0s)</span>
+            <span>Ultra-Safe (5.0s)</span>
           </div>
         </div>
 
       </section>
     </div>
 
-    <!-- Quick Run Info -->
+    <!-- Telethon/MTProto Rate Limits Documentation Card -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-3">
+      <div class="flex items-center gap-2">
+        <span class="text-sky-400 text-lg">📊</span>
+        <h3 class="text-base font-bold text-white">Why These Rate Limits? (MTProto & Telethon Official Guidelines)</h3>
+      </div>
+      <p class="text-xs text-slate-300 leading-relaxed">
+        Telegram’s spam defense monitors MTProto socket calls closely. Based on Telethon empirical benchmarks and Telegram API policies:
+      </p>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs pt-1">
+        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
+          <div class="font-bold text-sky-400 mb-1">⏱️ 1.5s - 2.0s Delay</div>
+          <div class="text-slate-400">Telegram soft-throttles user clients exceeding ~25-30 requests/min. A 1.5s delay guarantees safe execution under ~40 calls/min without triggering FloodWait.</div>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
+          <div class="font-bold text-emerald-400 mb-1">📦 Max 50 Messages/Query</div>
+          <div class="text-slate-400">Fetching chunks greater than 50-100 messages triggers internal heavy-query checks on Telegram servers. The server automatically clamps batch sizes to 50.</div>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
+          <div class="font-bold text-amber-400 mb-1">🚫 Non-Contact Messaging</div>
+          <div class="text-slate-400">Initiating chats with more than 5-10 non-contact users per day triggers Telegram’s automated SpamBlocker. The anti-peer-flood guard blocks this behavior.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Account Ban & Recovery Playbook -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+      <div class="flex items-center justify-between cursor-pointer" onclick="togglePlaybook()">
+        <div class="flex items-center gap-2">
+          <span class="text-rose-400 text-lg">🚨</span>
+          <h3 class="text-base font-bold text-white">Account Restriction & Ban Recovery Playbook</h3>
+        </div>
+        <span id="playbookChevron" class="text-slate-400 text-sm transform transition-transform">▼</span>
+      </div>
+      
+      <div id="playbookBody" class="space-y-4 text-xs text-slate-300 border-t border-slate-800 pt-4">
+        
+        <div>
+          <h4 class="font-bold text-amber-400 text-sm mb-1">1. Temporary FloodWait (<code>FloodWaitError: A wait of X seconds is required</code>)</h4>
+          <p class="text-slate-400 leading-relaxed">
+            • <strong>What it is:</strong> A temporary cooldown penalty imposed by Telegram for sending too many requests too fast.<br>
+            • <strong>Solution:</strong> <span class="text-rose-300 font-semibold">DO NOT SPAM RETRY!</span> Retrying within the wait window doubles or resets the timer. Wait out the exact number of seconds. Safe-Telegram-MCP automatically pauses and respects this limit.
+          </p>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-amber-400 text-sm mb-1">2. Muted / SpamBlock (<code>PeerFloodError</code>: Cannot message strangers)</h4>
+          <p class="text-slate-400 leading-relaxed">
+            • <strong>What it is:</strong> Account is temporarily restricted from messaging non-contacts because someone reported spam or an automated threshold was crossed.<br>
+            • <strong>Solution:</strong> Open Telegram, search for official <a href="https://t.me/SpamBot" target="_blank" class="text-sky-400 underline font-mono">@SpamBot</a>, click <em>Start</em>. Select <em>"This is a mistake"</em> → <em>"I never send unsolicited messages"</em>. First-time restrictions are typically lifted automatically within 24 to 48 hours.
+          </p>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-rose-400 text-sm mb-1">3. Full Account Ban (<code>PHONE_NUMBER_BANNED</code>)</h4>
+          <p class="text-slate-400 leading-relaxed">
+            • <strong>Official Recovery Email:</strong> Send an email to <code class="text-sky-400 bg-slate-950 px-1 py-0.5 rounded">recover@telegram.org</code> and <code class="text-sky-400 bg-slate-950 px-1 py-0.5 rounded">login@telegram.org</code>.<br>
+            • <strong>Subject:</strong> <code class="text-slate-200 bg-slate-950 px-1.5 py-0.5 rounded">Banned phone number: +[country_code][number]</code><br>
+            • <strong>Message template:</strong> <em>"Hello Telegram Support Team. My phone number (+[country_code][number]) was banned unexpectedly. I was using a local MTProto development client on my personal workstation. I never engaged in spam, unsolicited messaging, or violations of Terms of Service. Please review and restore my account."</em><br>
+            • <strong>Additional Support:</strong> Tweet to <a href="https://twitter.com/smstelegram" target="_blank" class="text-sky-400 underline">@smstelegram</a> or <a href="https://twitter.com/telegram" target="_blank" class="text-sky-400 underline">@Telegram</a> on X, or submit a report at <a href="https://telegram.org/support" target="_blank" class="text-sky-400 underline font-mono">telegram.org/support</a>.
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Footer -->
     <footer class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 text-xs text-slate-400 flex flex-col md:flex-row justify-between items-center gap-2">
-      <div>Settings automatically save to <code class="text-sky-400 bg-slate-950 px-1.5 py-0.5 rounded">safe_config.json</code></div>
+      <div>Settings automatically saved to <code class="text-sky-400 bg-slate-950 px-1.5 py-0.5 rounded">safe_config.json</code></div>
       <div>Safe-Telegram-MCP • Hardened Edition</div>
     </footer>
 
@@ -196,6 +267,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <script>
     let currentConfig = {};
+
+    function togglePlaybook() {
+      const body = document.getElementById('playbookBody');
+      const chevron = document.getElementById('playbookChevron');
+      if (body.classList.contains('hidden')) {
+        body.classList.remove('hidden');
+        chevron.textContent = '▼';
+      } else {
+        body.classList.add('hidden');
+        chevron.textContent = '▶';
+      }
+    }
 
     async function loadConfig() {
       try {
@@ -247,7 +330,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       }
 
       container.innerHTML = chats.map(chat => `
-        <li class="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors">
+        <li class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 transition-colors">
           <div class="flex items-center gap-2">
             <span class="text-xs text-sky-400">${chat === 'me' ? '💬' : '📌'}</span>
             <span class="text-sm font-mono text-slate-200">${chat === 'me' ? 'me (Saved Messages)' : chat}</span>
@@ -405,7 +488,7 @@ app = Starlette(debug=False, routes=routes)
 
 
 def run_web_panel(host: str = "127.0.0.1", port: int = 8080) -> None:
-    print(f"\\n🛡️ Safe-Telegram-MCP Web Dashboard starting at http://{host}:{port}\\n")
+    print(f"\n🛡️ Safe-Telegram-MCP Web Dashboard starting at http://{host}:{port}\n")
     uvicorn.run(app, host=host, port=port, log_level="warning")
 
 

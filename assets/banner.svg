@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 380" width="1200" height="380">
+  <defs>
+    <linearGradient id="bannerBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#030712" />
+      <stop offset="50%" stop-color="#0b1329" />
+      <stop offset="100%" stop-color="#021c38" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#818cf8" />
+      <stop offset="100%" stop-color="#c084fc" />
+    </linearGradient>
+    <radialGradient id="meshGlow" cx="20%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#030712" stop-opacity="0" />
+    </radialGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0284c7" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="380" fill="url(#bannerBg)" />
+  <rect width="1200" height="380" fill="url(#meshGlow)" />
+
+  <!-- Subtle Cyber Grid -->
+  <g stroke="#1e293b" stroke-width="0.7" opacity="0.4">
+    <line x1="0" y1="60" x2="1200" y2="60" />
+    <line x1="0" y1="120" x2="1200" y2="120" />
+    <line x1="0" y1="180" x2="1200" y2="180" />
+    <line x1="0" y1="240" x2="1200" y2="240" />
+    <line x1="0" y1="300" x2="1200" y2="300" />
+    <line x1="150" y1="0" x2="150" y2="380" />
+    <line x1="300" y1="0" x2="300" y2="380" />
+    <line x1="450" y1="0" x2="450" y2="380" />
+    <line x1="600" y1="0" x2="600" y2="380" />
+    <line x1="750" y1="0" x2="750" y2="380" />
+    <line x1="900" y1="0" x2="900" y2="380" />
+    <line x1="1050" y1="0" x2="1050" y2="380" />
+  </g>
+
+  <!-- Shield Icon Graphic on Left -->
+  <g transform="translate(100, 75)" filter="url(#shadow)">
+    <!-- Outer Shield -->
+    <path d="M110 15 L195 52 C195 142, 110 200, 110 215 C110 200, 25 142, 25 52 Z" 
+          fill="#0f172a" stroke="#38bdf8" stroke-width="5" stroke-linejoin="round" />
+    <path d="M110 32 L175 62 C175 130, 110 178, 110 190 C110 178, 45 130, 45 62 Z" 
+          fill="#0369a1" fill-opacity="0.25" stroke="#0ea5e9" stroke-width="2" />
+    <!-- Telegram Plane in Shield -->
+    <path d="M68 115 L155 75 L86 138 L68 115 Z" fill="#ffffff" />
+    <path d="M155 75 L106 155 L124 130 L155 75 Z" fill="#93c5fd" />
+    <path d="M86 138 L106 155 L98 128 Z" fill="#60a5fa" />
+  </g>
+
+  <!-- Typography on Right -->
+  <g transform="translate(360, 110)">
+    <!-- Pill Badge -->
+    <rect x="0" y="0" width="165" height="28" rx="14" fill="#0284c7" fill-opacity="0.25" stroke="#38bdf8" stroke-width="1" />
+    <text x="82" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#38bdf8" text-anchor="middle" letter-spacing="1">HARDENED EDITION</text>
+
+    <!-- Main Title -->
+    <text x="0" y="75" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="52" font-weight="900" fill="#f8fafc" letter-spacing="-1">Safe-Telegram-MCP</text>
+
+    <!-- Subtitle / Value Prop -->
+    <text x="0" y="115" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="500" fill="#94a3b8">
+      Zero-Leak Chat Whitelist • Anti-Flood Ban Protection • Local Web UI
+    </text>
+
+    <!-- Feature Tags -->
+    <g transform="translate(0, 150)">
+      <!-- Tag 1 -->
+      <rect x="0" y="0" width="160" height="32" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="80" y="20" font-family="system-ui" font-size="12" font-weight="600" fill="#e2e8f0" text-anchor="middle">🛡️ Whitelist Control</text>
+
+      <!-- Tag 2 -->
+      <rect x="175" y="0" width="155" height="32" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="252" y="20" font-family="system-ui" font-size="12" font-weight="600" fill="#e2e8f0" text-anchor="middle">⚡ FloodWait Guard</text>
+
+      <!-- Tag 3 -->
+      <rect x="345" y="0" width="135" height="32" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="412" y="20" font-family="system-ui" font-size="12" font-weight="600" fill="#e2e8f0" text-anchor="middle">🔒 Read-Only</text>
+
+      <!-- Tag 4 -->
+      <rect x="495" y="0" width="150" height="32" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="570" y="20" font-family="system-ui" font-size="12" font-weight="600" fill="#e2e8f0" text-anchor="middle">🖥️ Web Dashboard</text>
+    </g>
+  </g>
+</svg>

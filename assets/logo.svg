@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <linearGradient id="planeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e0f2fe" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="92" fill="url(#bgGrad)" stroke="#38bdf8" stroke-width="3" stroke-opacity="0.4" filter="url(#glow)"/>
+
+  <!-- Shield Outline -->
+  <path d="M100 32 L152 56 C152 110, 100 148, 100 158 C100 148, 48 110, 48 56 Z" 
+        fill="url(#shieldGrad)" fill-opacity="0.25" stroke="#38bdf8" stroke-width="4" stroke-linejoin="round" />
+
+  <!-- Inner Telegram Paper Plane -->
+  <path d="M72 98 L128 72 L84 114 L72 98 Z" fill="url(#planeGrad)" />
+  <path d="M128 72 L96 126 L108 108 L128 72 Z" fill="#93c5fd" />
+  <path d="M84 114 L96 126 L91 107 Z" fill="#60a5fa" />
+
+  <!-- Security Padlock Mini Badge -->
+  <circle cx="100" cy="148" r="14" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+  <rect x="94" y="145" width="12" height="9" rx="2" fill="#38bdf8" />
+  <path d="M96 145 V141 A4 4 0 0 1 104 141 V145" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" />
+</svg>
